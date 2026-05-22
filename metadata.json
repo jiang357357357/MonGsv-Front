@@ -1,0 +1,7 @@
+{
+  "name": "Copy of AmberFlux Neural Interface",
+  "description": "A futuristic, amber-accented interface for neural voice synthesis and model training simulation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

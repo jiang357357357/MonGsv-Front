@@ -1,0 +1,194 @@
+.training-workbench {
+  color: #1f2d3d;
+}
+
+.training-workbench .theme-section-sunken {
+  background: #e8eff7;
+  border-color: #c2cfdd;
+  box-shadow: none;
+}
+
+.training-workbench .training-page-surface {
+  background: linear-gradient(180deg, #d6e2ee 0%, #d3deea 100%);
+  border-color: #afc0d1;
+  box-shadow: none;
+}
+
+.training-workbench .theme-section {
+  background: #ffffff;
+  border: 1px solid #c4d3e1;
+  box-shadow: none;
+}
+
+.training-workbench .theme-section-nested {
+  background: #f1f6fb;
+  border: 1px solid #cbd8e4;
+}
+
+.training-workbench .theme-input,
+.training-workbench .theme-input input,
+.training-workbench .theme-input textarea,
+.training-workbench .theme-input select,
+.training-workbench input.theme-input,
+.training-workbench textarea.theme-input,
+.training-workbench select.theme-input {
+  background: #fcfeff;
+  border-color: #c9d4e0;
+  color: #1f2d3d;
+}
+
+.training-workbench .theme-input::placeholder,
+.training-workbench input.theme-input::placeholder,
+.training-workbench textarea.theme-input::placeholder {
+  color: #8a99aa;
+}
+
+.training-workbench .theme-input:focus {
+  border-color: #7daae6;
+  box-shadow: none;
+}
+
+.training-workbench .theme-dropdown-panel {
+  background: #f8fbfe;
+  border-color: #c9d4e0;
+  box-shadow: none;
+}
+
+.training-workbench .theme-button-disabled {
+  background: #e7edf4;
+  color: #93a2b4;
+  border: 1px solid #d1dbe6;
+}
+
+.training-workbench .training-tab {
+  background: #e3ebf4;
+  border-color: #bdcbda;
+}
+
+.training-workbench .training-tab:hover {
+  background: #edf4fb;
+}
+
+.training-workbench .training-tab-active {
+  background: #ffffff;
+  border-color: #8eb1df;
+  box-shadow: none;
+}
+
+.training-workbench .training-tab-active .theme-title,
+.training-workbench .training-tab-active .theme-subtitle,
+.training-workbench .training-tab-active .theme-nav-copy {
+  color: #1f4f8a;
+}
+
+.training-workbench .training-tab-active .theme-nav-icon {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(125, 170, 230, 0.45);
+  color: #1f4f8a;
+}
+
+.training-workbench .training-tab-inactive .theme-nav-icon {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(201, 212, 224, 0.9);
+}
+
+.training-workbench .training-select-large > div {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+.training-workbench .training-prep-select > div {
+  min-height: 5.4rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  border-radius: 1.5rem;
+}
+
+.training-workbench .training-select-large .theme-subtitle {
+  font-size: 0.72rem;
+  line-height: 1rem;
+}
+
+.training-workbench .training-select-large .theme-title,
+.training-workbench .training-select-large .theme-kicker {
+  font-size: 1.05rem;
+  line-height: 1.5rem;
+}
+
+.training-workbench .training-prep-select .theme-title,
+.training-workbench .training-prep-select .theme-kicker {
+  font-size: 1.15rem;
+  line-height: 1.7rem;
+}
+
+.training-workbench .training-select-large svg:last-child {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.training-workbench .training-upload-dropzone {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.training-workbench .training-upload-dropzone:hover {
+  background: transparent;
+}
+
+.training-workbench .training-upload-dropzone-active {
+  box-shadow: none;
+  background: transparent;
+}
+
+.training-workbench .training-upload-dropzone-icon {
+  background: #eef4fb;
+  border: 1px solid #d6e0ea;
+  color: #946200;
+}
+
+.training-workbench .training-upload-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.training-workbench .training-upload-filelist {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.training-workbench .training-upload-player {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #cfdae6;
+}
+
+.training-workbench .training-audio-player {
+  min-height: 3.5rem;
+}
+
+.training-workbench .training-upload-file-item {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #d2dcea;
+}
+
+.training-workbench .training-upload-empty {
+  flex: 1 1 auto;
+  border-color: #cfdae6;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.training-workbench .training-param-field {
+  justify-content: flex-start;
+}
+
+.training-workbench .training-param-input {
+  width: 7.25rem;
+}
+
+.training-workbench .training-prep-card {
+  justify-content: center;
+}
