@@ -23,6 +23,11 @@ export const buildSynthesizeUrl = (): string => {
   return `${baseUrl}/inference/tts`;
 };
 
+export const buildRoleEmotionSynthesisUrl = (): string => {
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl}/api/synthesis/role-emotion`;
+};
+
 export const buildTTSStateUrl = (): string => {
   const baseUrl = getApiBaseUrl();
   return `${baseUrl}/inference/models/info`;

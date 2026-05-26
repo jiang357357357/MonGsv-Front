@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Layers, Globe, AlertCircle } from 'lucide-react';
-import { getTTSState, loadTTSModels, synthesizeSpeech } from './Services/ttsService';
+import { synthesizeByRoleEmotion } from './Services/ttsService';
 import { getVersions, getCharacters, getEmotions } from './Services/infoService';
 import { useAudioPlayer } from './hooks';
 import { VersionInfo, EmotionInfo } from './types';
@@ -48,7 +48,6 @@ const SynthesisView: React.FC = () => {
 
   const { isPlaying, audioBuffer, setAudioBuffer, playAudio, stopAudio } = useAudioPlayer();
   const selectedRole = characters.find((character) => character.name === selectedCharacterName) || null;
-  const selectedEmotionInfo = emotions.find((emotion) => emotion.name === selectedEmotion) || null;
 
   // Load versions on mount
   useEffect(() => {
@@ -227,28 +226,6 @@ const SynthesisView: React.FC = () => {
     setModelStatus('待加载');
   }, [selectedRole]);
 
-  const ensureModelsLoaded = async (role: RoleInfo) => {
-    if (!role.gpt_model_path || !role.sov_model_path) {
-      throw new Error('当前角色缺少 GPT 或 SoVITS 模型路径');
-    }
-
-    const currentState = await getTTSState();
-    const alreadyLoaded = Boolean(
-      currentState.models_loaded &&
-      currentState.gpt_path === role.gpt_model_path &&
-      currentState.sovits_path === role.sov_model_path
-    );
-
-    if (alreadyLoaded) {
-      setModelStatus('模型已就绪');
-      return;
-    }
-
-    setModelStatus('加载模型中');
-    await loadTTSModels(role.gpt_model_path, role.sov_model_path);
-    setModelStatus('模型已就绪');
-  };
-
   const handleGenerate = async () => {
     if (!text.trim()) {
       setError('请输入要合成的文本');
@@ -270,17 +247,8 @@ const SynthesisView: React.FC = () => {
       return;
     }
 
-    if (!selectedEmotionInfo?.music_url) {
-      setError('请选择有效的情感参考音频');
-      return;
-    }
-
-    const refAudioPath = selectedEmotionInfo.music_url;
-    const promptText = selectedEmotionInfo.text;
-    const promptLanguage = selectedEmotionInfo.text_language || selectedLang;
-
-    if (!refAudioPath) {
-      setError('当前角色缺少参考音频，无法进行推理');
+    if (!selectedEmotion) {
+      setError('请选择情感');
       return;
     }
 
@@ -290,18 +258,20 @@ const SynthesisView: React.FC = () => {
     stopAudio();
 
     try {
-      await ensureModelsLoaded(selectedRole);
+      setModelStatus('后端准备模型');
 
-      const buffer = await synthesizeSpeech({
+      const buffer = await synthesizeByRoleEmotion({
+        role_id: selectedRole.id,
+        world_id: selectedWorldId === '' ? undefined : Number(selectedWorldId),
+        version: selectedVersionId,
+        emotion: selectedEmotion,
         text: text.trim(),
         text_language: selectedLang,
-        ref_audio_path: refAudioPath,
-        prompt_text: promptText,
-        prompt_language: promptLanguage,
         speed: speedFactor,
         how_to_cut: '按标点符号切',
       });
       
+      setModelStatus('模型已就绪');
       setAudioBuffer(buffer);
       await playAudio(buffer, speedFactor);
 

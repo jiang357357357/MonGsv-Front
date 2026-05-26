@@ -1,4 +1,5 @@
 import {
+  buildRoleEmotionSynthesisUrl,
   buildSynthesizeUrl,
   buildTTSCleanupModelsUrl,
   buildTTSLoadModelsUrl,
@@ -8,6 +9,7 @@ import {
 import {
   TTSCleanupModelsResponse,
   TTSLoadModelsResponse,
+  RoleEmotionSynthesisParams,
   TTSRequestParams,
   TTSError,
   TTSStateResponse,
@@ -97,6 +99,35 @@ export const synthesizeSpeech = async (params: TTSRequestParams): Promise<AudioB
   const payload = await response.json();
   if (!payload?.success) {
     throw new Error(payload?.message || 'TTS合成失败');
+  }
+  if (!payload.audio_data) {
+    throw new Error('后端未返回音频数据');
+  }
+
+  return await decodeAudioBuffer(decodeBase64Audio(payload.audio_data));
+};
+
+export const synthesizeByRoleEmotion = async (params: RoleEmotionSynthesisParams): Promise<AudioBuffer> => {
+  const apiUrl = buildRoleEmotionSynthesisUrl();
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...params,
+      text_language: mapLanguageToCode(params.text_language),
+      return_base64: true,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await extractError(response, '按角色情感合成失败'));
+  }
+
+  const payload = await response.json();
+  if (!payload?.success) {
+    throw new Error(payload?.message || '按角色情感合成失败');
   }
   if (!payload.audio_data) {
     throw new Error('后端未返回音频数据');

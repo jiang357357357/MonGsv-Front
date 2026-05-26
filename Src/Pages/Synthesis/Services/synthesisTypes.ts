@@ -54,6 +54,25 @@ export interface TTSRequestParams {
   inp_refs?: string[];
 }
 
+export interface RoleEmotionSynthesisParams {
+  role_id: number;
+  emotion: string;
+  text: string;
+  text_language: string;
+  world_id?: number;
+  version?: string;
+  speed?: number;
+  how_to_cut?: string;
+  top_k?: number;
+  top_p?: number;
+  temperature?: number;
+  sample_steps?: number;
+  if_sr?: boolean;
+  ref_free?: boolean;
+  if_freeze?: boolean;
+  pause_second?: number;
+}
+
 export interface TTSError {
   detail?: string;
   message?: string;
