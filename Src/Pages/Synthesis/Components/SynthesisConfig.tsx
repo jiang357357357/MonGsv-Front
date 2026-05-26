@@ -1,8 +1,8 @@
 import React from 'react';
-import { User, Languages, Smile, Gauge } from 'lucide-react';
+import { User, Languages, Smile, Gauge, Scissors } from 'lucide-react';
 import CustomSelect from '../../Emotion/Components/CustomSelect';
 import { EmotionInfo } from '../types';
-import { LANGUAGES } from '../constants';
+import { CUT_METHODS, LANGUAGES } from '../constants';
 
 interface SynthesisConfigProps {
   selectedCharacterName: string;
@@ -12,6 +12,8 @@ interface SynthesisConfigProps {
   selectedWorldId: number | '';
   selectedLang: string;
   setSelectedLang: (lang: string) => void;
+  selectedCutMethod: string;
+  setSelectedCutMethod: (method: string) => void;
   selectedEmotion: string;
   setSelectedEmotion: (emotion: string) => void;
   emotions: EmotionInfo[];
@@ -28,6 +30,8 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
   selectedWorldId,
   selectedLang,
   setSelectedLang,
+  selectedCutMethod,
+  setSelectedCutMethod,
   selectedEmotion,
   setSelectedEmotion,
   emotions,
@@ -66,10 +70,9 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
         </div>
       </div>
 
-      {/* Second Row: Emotion & Speed */}
+      {/* Second Row: Emotion, Cut Method & Speed */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
-        {/* Emotion Select (Wider) */}
-        <div className="sm:col-span-8 space-y-3">
+        <div className="sm:col-span-5 space-y-3">
           <CustomSelect
             label="情感风格"
             icon={<Smile className="theme-accent-icon w-4 h-4" />}
@@ -86,7 +89,18 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
           />
         </div>
 
-        {/* Speed Factor (Narrower) */}
+        <div className="sm:col-span-3 space-y-3">
+          <CustomSelect
+            label="切分方式"
+            icon={<Scissors className="theme-info-text w-4 h-4" />}
+            value={selectedCutMethod}
+            options={CUT_METHODS.map(method => ({ id: method, name: method }))}
+            onChange={setSelectedCutMethod}
+            className="w-full"
+            variant="filled"
+          />
+        </div>
+
         <div className="sm:col-span-4 space-y-3">
           <div className="theme-input flex flex-col px-5 py-2.5 rounded-[20px] hover:border-[var(--color-amber-400)] transition-all">
             <span className="theme-subtitle text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5 mb-1">

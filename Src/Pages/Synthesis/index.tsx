@@ -35,6 +35,7 @@ const SynthesisView: React.FC = () => {
   const [selectedCharacterName, setSelectedCharacterName] = useState<string>('');
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
   const [selectedLang, setSelectedLang] = useState('中文');
+  const [selectedCutMethod, setSelectedCutMethod] = useState('凑四句一切');
   const [speedFactor, setSpeedFactor] = useState(1.0);
   
   const [text, setText] = useState('你好，这是一段测试文本');
@@ -268,7 +269,7 @@ const SynthesisView: React.FC = () => {
         text: text.trim(),
         text_language: selectedLang,
         speed: speedFactor,
-        how_to_cut: '按标点符号切',
+        how_to_cut: selectedCutMethod,
       });
       
       setModelStatus('模型已就绪');
@@ -340,6 +341,8 @@ const SynthesisView: React.FC = () => {
               selectedWorldId={selectedWorldId}
               selectedLang={selectedLang}
               setSelectedLang={setSelectedLang}
+              selectedCutMethod={selectedCutMethod}
+              setSelectedCutMethod={setSelectedCutMethod}
               selectedEmotion={selectedEmotion}
               setSelectedEmotion={setSelectedEmotion}
               emotions={emotions}
