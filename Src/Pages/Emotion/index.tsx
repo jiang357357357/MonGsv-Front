@@ -67,12 +67,23 @@ const EmotionConfigView: React.FC = () => {
       return null;
     }
 
-    return roleWorkspaces.find((workspace) =>
+    const matchingWorkspaces = roleWorkspaces.filter((workspace) =>
       workspace.role_name === selectedCharacterName &&
-      (workspace.world_name || '') === (selectedWorld?.name || '') &&
       (workspace.base_version || '') === selectedVersionId,
-    ) || null;
+    );
+
+    return matchingWorkspaces.find((workspace) =>
+      (workspace.world_name || '') === (selectedWorld?.name || ''),
+    ) || matchingWorkspaces[0] || null;
   }, [roleWorkspaces, selectedCharacterName, selectedVersionId, selectedWorld?.name]);
+  const selectedSlicedAudioFiles = selectedWorkspace?.model_sliced_files?.length
+    ? selectedWorkspace.model_sliced_files
+    : selectedWorkspace?.sliced_files || [];
+  const selectedSlicedDirectory = selectedWorkspace?.model_sliced_files?.length
+    ? selectedWorkspace.model_sliced_dir
+    : selectedWorkspace?.sliced_files?.length
+      ? selectedWorkspace.sliced_dir || ''
+      : selectedWorkspace?.model_sliced_dir || selectedWorkspace?.sliced_dir || '';
   const availableRoles = useMemo(() => {
     const seen = new Set<string>();
     return characters.filter((role) => {
@@ -592,8 +603,8 @@ const EmotionConfigView: React.FC = () => {
            onAdd={handleAddNewEmotion}
            version={selectedVersionId}
            characterName={selectedCharacterName}
-           slicedDirectory={selectedWorkspace?.model_sliced_dir || ''}
-           slicedAudioFiles={selectedWorkspace?.model_sliced_files || []}
+           slicedDirectory={selectedSlicedDirectory}
+           slicedAudioFiles={selectedSlicedAudioFiles}
            existingEmotions={emotions.map(e => e.emotion)}
            error={error}
            onErrorChange={setError}

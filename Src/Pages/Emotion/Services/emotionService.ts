@@ -46,6 +46,8 @@ export interface RoleWorkspaceInfo {
   base_version?: string | null;
   model_sliced_dir: string;
   model_sliced_files?: string[];
+  sliced_dir?: string;
+  sliced_files?: string[];
 }
 
 export interface SaveRoleEmotionParams {
