@@ -192,8 +192,11 @@ export const getRoleWorkspaces = async (): Promise<RoleWorkspaceInfo[]> => {
 
 export const getAudioFileUrl = (audioFile: string): string => {
   const baseUrl = getApiBaseUrl().replace(/\/+$/g, '');
-  const cleanPath = audioFile.startsWith('/') ? audioFile : `/${audioFile}`;
-  return `${baseUrl}${cleanPath}`;
+  if (audioFile.startsWith('/inference/') || audioFile.startsWith('/api/')) {
+    const cleanPath = audioFile.startsWith('/') ? audioFile : `/${audioFile}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+  return `${baseUrl}/inference/ref-audio?path=${encodeURIComponent(audioFile)}`;
 };
 
 const parseTranscribePayload = (
