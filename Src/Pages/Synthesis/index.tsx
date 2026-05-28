@@ -36,6 +36,7 @@ const SynthesisView: React.FC = () => {
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
   const [selectedLang, setSelectedLang] = useState('中文');
   const [selectedCutMethod, setSelectedCutMethod] = useState('凑四句一切');
+  const [selectedInferenceMode, setSelectedInferenceMode] = useState('normal');
   const [speedFactor, setSpeedFactor] = useState(1.0);
   
   const [text, setText] = useState('你好，这是一段测试文本');
@@ -270,6 +271,8 @@ const SynthesisView: React.FC = () => {
         text_language: selectedLang,
         speed: speedFactor,
         how_to_cut: selectedCutMethod,
+        use_cuda_graph: selectedInferenceMode !== 'normal',
+        cuda_graph_mode: selectedInferenceMode === 'decoder_only' ? 'decoder_only' : 'graph',
       });
       
       setModelStatus('模型已就绪');
@@ -343,6 +346,8 @@ const SynthesisView: React.FC = () => {
               setSelectedLang={setSelectedLang}
               selectedCutMethod={selectedCutMethod}
               setSelectedCutMethod={setSelectedCutMethod}
+              selectedInferenceMode={selectedInferenceMode}
+              setSelectedInferenceMode={setSelectedInferenceMode}
               selectedEmotion={selectedEmotion}
               setSelectedEmotion={setSelectedEmotion}
               emotions={emotions}

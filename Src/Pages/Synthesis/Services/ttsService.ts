@@ -86,6 +86,8 @@ export const synthesizeSpeech = async (params: TTSRequestParams): Promise<AudioB
   if (params.ref_free !== undefined) formData.append('ref_free', String(params.ref_free));
   if (params.if_freeze !== undefined) formData.append('if_freeze', String(params.if_freeze));
   if (params.pause_second !== undefined) formData.append('pause_second', params.pause_second.toString());
+  if (params.use_cuda_graph !== undefined) formData.append('use_cuda_graph', String(params.use_cuda_graph));
+  if (params.cuda_graph_mode !== undefined) formData.append('cuda_graph_mode', params.cuda_graph_mode);
 
   const response = await fetch(apiUrl, {
     method: 'POST',
