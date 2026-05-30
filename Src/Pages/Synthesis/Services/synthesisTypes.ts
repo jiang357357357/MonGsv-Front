@@ -51,8 +51,7 @@ export interface TTSRequestParams {
   ref_free?: boolean;
   if_freeze?: boolean;
   pause_second?: number;
-  use_cuda_graph?: boolean;
-  cuda_graph_mode?: string;
+  inference_mode?: 'normal' | 'accelerated' | string;
   inp_refs?: string[];
 }
 
@@ -73,8 +72,7 @@ export interface RoleEmotionSynthesisParams {
   ref_free?: boolean;
   if_freeze?: boolean;
   pause_second?: number;
-  use_cuda_graph?: boolean;
-  cuda_graph_mode?: string;
+  inference_mode?: 'normal' | 'accelerated' | string;
 }
 
 export interface TTSError {

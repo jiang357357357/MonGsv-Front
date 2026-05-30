@@ -45,8 +45,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
 }) => {
   const inferenceModeOptions = [
     { id: 'normal', name: '普通推理' },
-    { id: 'decoder_only', name: 'CUDA 解码器' },
-    { id: 'graph', name: 'CUDA Graph' },
+    { id: 'accelerated', name: '加速推理' },
   ];
 
   return (

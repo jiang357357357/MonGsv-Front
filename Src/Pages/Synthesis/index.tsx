@@ -271,8 +271,7 @@ const SynthesisView: React.FC = () => {
         text_language: selectedLang,
         speed: speedFactor,
         how_to_cut: selectedCutMethod,
-        use_cuda_graph: selectedInferenceMode !== 'normal',
-        cuda_graph_mode: selectedInferenceMode === 'decoder_only' ? 'decoder_only' : 'graph',
+        inference_mode: selectedInferenceMode,
       });
       
       setModelStatus('模型已就绪');
