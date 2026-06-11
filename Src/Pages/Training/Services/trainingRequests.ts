@@ -5,6 +5,8 @@ export interface FullTrainingRequest {
   language: string;
   version: string;
   world_name?: string;
+  preprocessing_mode?: 'full' | 'existing';
+  list_file?: string;
   train_gpt: boolean;
   train_sovits: boolean;
   gpt_batch_size: number;

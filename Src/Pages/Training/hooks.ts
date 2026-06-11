@@ -216,6 +216,7 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       params.version,
     );
     const inputAudioDir = (params.inputAudioDir || '').trim() || derivedPaths?.inputAudioDir || '';
+    const listFile = (params.listFile || '').trim();
     const outputDir = (params.outputDir || '').trim() || derivedPaths?.outputDir || '';
     if (!params.worldName?.trim()) {
       setError('所属世界不能为空');
@@ -230,7 +231,11 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       return;
     }
     if (!inputAudioDir) {
-      setError('输入音频目录不能为空');
+      setError(params.preprocessingMode === 'existing' ? '切分音频目录不能为空' : '输入音频目录不能为空');
+      return;
+    }
+    if (params.preprocessingMode === 'existing' && !listFile) {
+      setError('标注文件不能为空');
       return;
     }
     if (!outputDir) {
@@ -259,6 +264,8 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
         language: params.language,
         version: params.version,
         world_name: params.worldName.trim(),
+        preprocessing_mode: params.preprocessingMode,
+        list_file: listFile,
         train_gpt: params.trainGpt,
         train_sovits: params.trainSovits,
         gpt_batch_size: params.gptBatchSize,

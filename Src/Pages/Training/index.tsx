@@ -5,6 +5,7 @@ import {
   Cpu,
   Database,
   FolderCog,
+  FolderOpen,
   Globe,
   Layers,
   Loader2,
@@ -27,6 +28,8 @@ import {
   getWorlds,
   RoleInfo,
   RoleWorkspaceInfo,
+  selectLocalDirectory,
+  selectLocalFile,
   WorldInfo,
 } from './Services/trainingApi';
 import TrainingMonitor from './Components/TrainingMonitor';
@@ -48,6 +51,37 @@ const dirnameFromPath = (value: string): string => {
   }
   const parent = normalized.slice(0, index);
   return trimmed.includes('\\') ? parent.replace(/\//g, '\\') : parent;
+};
+
+const basenameFromPath = (value: string): string => {
+  const trimmed = trimTrailingSeparators(value);
+  if (!trimmed) {
+    return '';
+  }
+  const normalized = trimmed.replace(/\\/g, '/');
+  const index = normalized.lastIndexOf('/');
+  return index >= 0 ? normalized.slice(index + 1) : normalized;
+};
+
+const joinPath = (...parts: string[]): string => {
+  const validParts = parts.filter(Boolean);
+  if (validParts.length === 0) {
+    return '';
+  }
+  const separator = validParts[0].includes('\\') ? '\\' : '/';
+  return validParts
+    .map((part, index) => (index === 0 ? trimTrailingSeparators(part) : part.replace(/^[\\/]+|[\\/]+$/g, '')))
+    .join(separator);
+};
+
+const fallbackPath = (current: string, derived?: string): string => current || derived || '';
+
+const buildListFilePath = (workspace: RoleWorkspaceInfo | null, currentValue: string): string => {
+  if (!workspace) {
+    return currentValue;
+  }
+  const slicedName = basenameFromPath(workspace.sliced_dir) || 'sliced';
+  return joinPath(workspace.role_root, 'dataset', 'asr', `${slicedName}.list`);
 };
 
 const normalizePathSegment = (value: string): string =>
@@ -110,6 +144,7 @@ interface NavItem {
 
 const TrainingDashboard: React.FC = () => {
   const [params, setParams] = useState<TrainingParams>({
+    preprocessingMode: 'full',
     version: '',
     language: 'zh',
     worldId: null,
@@ -117,6 +152,7 @@ const TrainingDashboard: React.FC = () => {
     roleId: null,
     characterName: '',
     inputAudioDir: '',
+    listFile: '',
     outputDir: 'Data/Output',
     trainSovits: true,
     trainGpt: true,
@@ -144,6 +180,7 @@ const TrainingDashboard: React.FC = () => {
   const [activePanel, setActivePanel] = useState<TrainingPanel>('identity');
   const [isDraggingAudio, setIsDraggingAudio] = useState(false);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const audioDirectoryInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     isTraining,
@@ -257,12 +294,18 @@ const TrainingDashboard: React.FC = () => {
       roleName,
       params.version,
     );
-
     setParams((prev) => ({
       ...prev,
       roleId,
       characterName: roleName,
-      inputAudioDir: workspace?.raw_dir || derivedPaths?.inputAudioDir || prev.inputAudioDir,
+      inputAudioDir:
+        prev.preprocessingMode === 'existing'
+          ? workspace?.sliced_dir || fallbackPath(prev.inputAudioDir, derivedPaths?.inputAudioDir)
+          : workspace?.raw_dir || derivedPaths?.inputAudioDir || prev.inputAudioDir,
+      listFile:
+        prev.preprocessingMode === 'existing'
+          ? buildListFilePath(workspace, prev.listFile)
+          : prev.listFile,
       outputDir:
         (workspace ? dirnameFromPath(workspace.role_root) : '') || derivedPaths?.outputDir || prev.outputDir,
     }));
@@ -281,11 +324,18 @@ const TrainingDashboard: React.FC = () => {
     );
     setParams((prev) => ({
       ...prev,
-      inputAudioDir: workspace?.raw_dir || derivedPaths?.inputAudioDir || prev.inputAudioDir,
+      inputAudioDir:
+        prev.preprocessingMode === 'existing'
+          ? workspace?.sliced_dir || fallbackPath(prev.inputAudioDir, derivedPaths?.inputAudioDir)
+          : workspace?.raw_dir || derivedPaths?.inputAudioDir || prev.inputAudioDir,
+      listFile:
+        prev.preprocessingMode === 'existing'
+          ? buildListFilePath(workspace, prev.listFile)
+          : prev.listFile,
       outputDir:
         (workspace ? dirnameFromPath(workspace.role_root) : '') || derivedPaths?.outputDir || prev.outputDir,
     }));
-  }, [roleWorkspaces, params.characterName, params.worldName, params.version]);
+  }, [roleWorkspaces, params.characterName, params.worldName, params.version, params.preprocessingMode]);
 
   const handleRoleBlur = () => {
     applyRole(params.characterName || '');
@@ -302,7 +352,11 @@ const TrainingDashboard: React.FC = () => {
   const selectedWorkspace = findMatchingWorkspace(roleWorkspaces, roleName, params.worldName || '');
   const hasExistingRawAudio = Boolean(selectedWorkspace?.raw_files?.length);
   const hasPendingAudioFiles = selectedAudioFiles.length > 0;
-  const hasTrainingAudioSource = hasExistingRawAudio || hasPendingAudioFiles;
+  const isExistingDatasetMode = params.preprocessingMode === 'existing';
+  const hasExistingDatasetSource = Boolean(params.inputAudioDir.trim() && params.listFile.trim());
+  const hasTrainingAudioSource = isExistingDatasetMode
+    ? hasExistingDatasetSource
+    : hasExistingRawAudio || hasPendingAudioFiles;
   const canStartTraining = Boolean(
     params.worldName?.trim() && roleName && params.version.trim() && hasTrainingAudioSource
   );
@@ -312,6 +366,10 @@ const TrainingDashboard: React.FC = () => {
       ? '请先选择或填写角色'
       : !params.version.trim()
       ? '请先选择版本'
+    : isExistingDatasetMode && !params.inputAudioDir.trim()
+      ? '请填写切分音频目录'
+    : isExistingDatasetMode && !params.listFile.trim()
+      ? '请填写标注文件'
     : !hasTrainingAudioSource
         ? '请先选择训练音频'
         : '开始训练任务';
@@ -323,6 +381,10 @@ const TrainingDashboard: React.FC = () => {
       ? '选择角色'
       : !params.version.trim()
         ? '选择基础模型版本'
+        : isExistingDatasetMode && !params.inputAudioDir.trim()
+          ? '填写切分音频目录'
+          : isExistingDatasetMode && !params.listFile.trim()
+            ? '填写标注文件'
         : !hasTrainingAudioSource
             ? '选择训练音频'
               : !isTraining
@@ -334,7 +396,8 @@ const TrainingDashboard: React.FC = () => {
       setSelectedAudioFiles([]);
       return;
     }
-    setSelectedAudioFiles([files[0]]);
+    const audioFiles = Array.from(files).filter(isAudioFile);
+    setSelectedAudioFiles(audioFiles.length > 0 ? audioFiles : [files[0]]);
   };
 
   const handleAudioDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -361,10 +424,60 @@ const TrainingDashboard: React.FC = () => {
     };
   }, [selectedAudioPreviewUrl]);
 
+  useEffect(() => {
+    if (!audioDirectoryInputRef.current) {
+      return;
+    }
+    audioDirectoryInputRef.current.setAttribute('webkitdirectory', '');
+    audioDirectoryInputRef.current.setAttribute('directory', '');
+  }, []);
+
   const removeAudioFile = () => {
     setSelectedAudioFiles([]);
     if (audioInputRef.current) {
       audioInputRef.current.value = '';
+    }
+    if (audioDirectoryInputRef.current) {
+      audioDirectoryInputRef.current.value = '';
+    }
+  };
+
+  const handleAudioDirectorySelected = (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      setSelectedAudioFiles([]);
+      return;
+    }
+    const audioFiles = Array.from(files).filter(isAudioFile);
+    setSelectedAudioFiles(audioFiles);
+  };
+
+  const chooseExistingAudioDirectory = async () => {
+    try {
+      const path = await selectLocalDirectory('选择切分音频目录', params.inputAudioDir || '');
+      if (path) {
+        setParams((prev) => ({ ...prev, inputAudioDir: path }));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '打开文件夹选择器失败';
+      logger.error('选择切分音频目录失败', { error: err });
+      window.alert(message);
+    }
+  };
+
+  const chooseExistingListFile = async () => {
+    try {
+      const path = await selectLocalFile(
+        '选择标注 list 文件',
+        params.listFile ? dirnameFromPath(params.listFile) : params.inputAudioDir,
+        [['List files', '*.list'], ['Text files', '*.txt'], ['All files', '*.*']],
+      );
+      if (path) {
+        setParams((prev) => ({ ...prev, listFile: path }));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '打开文件选择器失败';
+      logger.error('选择标注文件失败', { error: err });
+      window.alert(message);
     }
   };
 
@@ -428,7 +541,7 @@ const TrainingDashboard: React.FC = () => {
               variant="filled"
             />
           </div>
-          <div className="training-prep-card theme-section flex min-h-[136px] items-center justify-between gap-5 rounded-xl px-6 py-6">
+          <div className="training-prep-card theme-section flex min-h-[132px] items-center justify-between gap-5 rounded-xl px-6 py-6">
             <div className="theme-title flex items-center gap-3 whitespace-nowrap text-base font-black">
               <Layers className="h-5 w-5" /> 角色名称
             </div>
@@ -477,7 +590,7 @@ const TrainingDashboard: React.FC = () => {
         </div>
 
         <div className="space-y-3">
-          <div className="training-prep-card theme-section flex min-h-[154px] flex-col gap-3 rounded-xl px-5 py-5">
+          <div className="training-prep-card theme-section flex min-h-[132px] flex-col gap-3 rounded-xl px-5 py-5">
             <label htmlFor="gpuNumbers" className="theme-title flex items-center gap-3 text-base font-black">
               <Cpu className="h-5 w-5" /> GPU 编号
             </label>
@@ -493,7 +606,24 @@ const TrainingDashboard: React.FC = () => {
             />
           </div>
 
-          <div className="training-prep-card theme-section flex min-h-[154px] flex-col gap-3 rounded-xl px-5 py-5">
+          <div className="training-prep-card theme-section flex min-h-[132px] flex-col gap-3 rounded-xl px-5 py-5">
+            <label htmlFor="preprocessingMode" className="theme-title flex items-center gap-3 text-base font-black">
+              <Database className="h-5 w-5" /> 预处理模式
+            </label>
+            <select
+              id="preprocessingMode"
+              name="preprocessingMode"
+              value={params.preprocessingMode}
+              onChange={handleChange}
+              disabled={isTraining}
+              className="theme-input w-full rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black disabled:opacity-50"
+            >
+              <option value="full">完整流程</option>
+              <option value="existing">已有标注</option>
+            </select>
+          </div>
+
+          <div className="training-prep-card theme-section flex min-h-[132px] flex-col gap-3 rounded-xl px-5 py-5">
             <label htmlFor="language" className="theme-title text-base font-black">
               标注语言
             </label>
@@ -520,13 +650,13 @@ const TrainingDashboard: React.FC = () => {
             <div
               onDragEnter={(event) => {
                 event.preventDefault();
-                if (!isTraining && roleName) {
+                if (!isTraining && roleName && !isExistingDatasetMode) {
                   setIsDraggingAudio(true);
                 }
               }}
               onDragOver={(event) => {
                 event.preventDefault();
-                if (!isTraining && roleName) {
+                if (!isTraining && roleName && !isExistingDatasetMode) {
                   setIsDraggingAudio(true);
                 }
               }}
@@ -539,13 +669,15 @@ const TrainingDashboard: React.FC = () => {
               }}
               onDrop={handleAudioDrop}
               onClick={() => {
-                if (!isTraining && roleName) {
+                if (!isTraining && roleName && !isExistingDatasetMode) {
                   audioInputRef.current?.click();
                 }
               }}
               className={`training-upload-dropzone transition-all ${
                 isTraining || !roleName
                   ? 'cursor-not-allowed opacity-70'
+                  : isExistingDatasetMode
+                    ? 'cursor-default'
                   : 'cursor-pointer'
               } ${isDraggingAudio ? 'training-upload-dropzone-active' : ''}`}
             >
@@ -553,19 +685,91 @@ const TrainingDashboard: React.FC = () => {
                 ref={audioInputRef}
                 type="file"
                 accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.aac"
-                disabled={isTraining || !roleName}
+                disabled={isTraining || !roleName || isExistingDatasetMode}
                 onChange={(event) => handleAudioSelected(event.target.files)}
+                className="hidden"
+              />
+              <input
+                ref={audioDirectoryInputRef}
+                type="file"
+                multiple
+                disabled={isTraining || !roleName || isExistingDatasetMode}
+                onChange={(event) => handleAudioDirectorySelected(event.target.files)}
                 className="hidden"
               />
               <div className="flex min-h-[260px] flex-col gap-5">
                 <div className="training-upload-panel flex min-h-0 flex-1 flex-col px-4 py-4">
                   <div className="training-upload-filelist min-h-0 flex-1">
-                    {selectedAudioFile && selectedAudioPreviewUrl ? (
+                    {isExistingDatasetMode ? (
+                      <div
+                        className="training-upload-empty flex h-full min-h-[260px] flex-col justify-center gap-4 px-5 py-5"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="training-upload-dropzone-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.1rem]">
+                            <Database className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="theme-title text-xl font-black">已有标注数据</div>
+                            <div className="theme-subtitle mt-1 text-sm">使用切分音频目录和 .list 标注文件</div>
+                          </div>
+                        </div>
+                        <label className="block">
+                          <span className="theme-subtitle mb-2 block text-sm font-black">切分音频目录</span>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <input
+                              name="inputAudioDir"
+                              value={params.inputAudioDir}
+                              onChange={handleChange}
+                              disabled={isTraining}
+                              className="theme-input min-w-0 flex-1 rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 font-mono text-xs transition-all disabled:opacity-50"
+                            />
+                            <button
+                              type="button"
+                              onClick={chooseExistingAudioDirectory}
+                              disabled={isTraining}
+                              className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black ${
+                                isTraining ? 'theme-button-disabled' : 'theme-section'
+                              }`}
+                            >
+                              <FolderOpen className="h-4 w-4" />
+                              选择语音文件夹
+                            </button>
+                          </div>
+                        </label>
+                        <label className="block">
+                          <span className="theme-subtitle mb-2 block text-sm font-black">标注文件</span>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <input
+                              name="listFile"
+                              value={params.listFile}
+                              onChange={handleChange}
+                              disabled={isTraining}
+                              className="theme-input min-w-0 flex-1 rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 font-mono text-xs transition-all disabled:opacity-50"
+                            />
+                            <button
+                              type="button"
+                              onClick={chooseExistingListFile}
+                              disabled={isTraining}
+                              className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black ${
+                                isTraining ? 'theme-button-disabled' : 'theme-section'
+                              }`}
+                            >
+                              选择 list 文件
+                            </button>
+                          </div>
+                        </label>
+                      </div>
+                    ) : selectedAudioFile && selectedAudioPreviewUrl ? (
                       <div className="training-upload-player flex h-full flex-col justify-center rounded-2xl px-6 py-6">
                         <div className="mb-4 flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="truncate text-2xl font-black">{selectedAudioFile.name}</div>
-                            <div className="theme-subtitle mt-1 text-base">{formatFileSize(selectedAudioFile.size)}</div>
+                            <div className="theme-subtitle mt-1 text-base">
+                              {selectedAudioFiles.length > 1
+                                ? `已选择 ${selectedAudioFiles.length} 个音频`
+                                : formatFileSize(selectedAudioFile.size)}
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -593,29 +797,66 @@ const TrainingDashboard: React.FC = () => {
                           <Upload className="h-7 w-7" />
                         </div>
                         <div className="theme-title text-center text-2xl font-black">
-                          {roleName ? '拖入音频文件或点击这里选择' : '先选择角色'}
+                          {isExistingDatasetMode
+                            ? '使用已有切分目录'
+                            : roleName
+                              ? '拖入音频文件或点击这里选择'
+                              : '先选择角色'}
                         </div>
                         {!roleName ? (
                           <div className="theme-subtitle mt-3 text-center text-base">选择角色后即可加入训练音频。</div>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            audioInputRef.current?.click();
-                          }}
-                          disabled={isTraining || !roleName}
-                          className={`mt-6 rounded-2xl px-7 py-4 text-lg font-black ${
-                            isTraining || !roleName
-                              ? 'theme-button-disabled'
-                              : 'theme-section'
-                          }`}
-                        >
-                          选择文件
-                        </button>
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              audioInputRef.current?.click();
+                            }}
+                            disabled={isTraining || !roleName || isExistingDatasetMode}
+                            className={`rounded-2xl px-7 py-4 text-lg font-black ${
+                              isTraining || !roleName || isExistingDatasetMode
+                                ? 'theme-button-disabled'
+                                : 'theme-section'
+                            }`}
+                          >
+                            选择文件
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              audioDirectoryInputRef.current?.click();
+                            }}
+                            disabled={isTraining || !roleName || isExistingDatasetMode}
+                            className={`inline-flex items-center gap-2 rounded-2xl px-7 py-4 text-lg font-black ${
+                              isTraining || !roleName || isExistingDatasetMode
+                                ? 'theme-button-disabled'
+                                : 'theme-section'
+                            }`}
+                          >
+                            <FolderOpen className="h-5 w-5" />
+                            选择文件夹
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
+                  {!isExistingDatasetMode ? (
+                    <label
+                      className="mt-4 block"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span className="theme-subtitle mb-2 block text-sm font-black">原始音频目录</span>
+                      <input
+                        name="inputAudioDir"
+                        value={params.inputAudioDir}
+                        onChange={handleChange}
+                        disabled={isTraining}
+                        className="theme-input w-full rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 font-mono text-xs transition-all disabled:opacity-50"
+                      />
+                    </label>
+                  ) : null}
                 </div>
               </div>
             </div>

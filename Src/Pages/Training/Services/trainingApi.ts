@@ -31,6 +31,12 @@ export interface RoleWorkspaceInfo {
   model_sliced_files?: string[];
 }
 
+export interface LocalDialogResponse {
+  success: boolean;
+  path: string;
+  cancelled: boolean;
+}
+
 const parseError = async (response: Response, fallback: string): Promise<string> => {
   try {
     const data = await response.json();
@@ -38,6 +44,53 @@ const parseError = async (response: Response, fallback: string): Promise<string>
   } catch {
     return `HTTP ${response.status}: ${response.statusText || fallback}`;
   }
+};
+
+export const selectLocalDirectory = async (
+  title: string,
+  initialDir = '',
+): Promise<string> => {
+  const baseUrl = getApiBaseUrl();
+  const apiUrl = `${baseUrl}/system/dialog/select-directory`;
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, initial_dir: initialDir }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, '打开文件夹选择器失败'));
+  }
+
+  const data = await response.json() as LocalDialogResponse;
+  if (!data.success) {
+    throw new Error('打开文件夹选择器失败');
+  }
+  return data.path || '';
+};
+
+export const selectLocalFile = async (
+  title: string,
+  initialDir = '',
+  filetypes: Array<[string, string]> = [['All files', '*.*']],
+): Promise<string> => {
+  const baseUrl = getApiBaseUrl();
+  const apiUrl = `${baseUrl}/system/dialog/select-file`;
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, initial_dir: initialDir, filetypes }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, '打开文件选择器失败'));
+  }
+
+  const data = await response.json() as LocalDialogResponse;
+  if (!data.success) {
+    throw new Error('打开文件选择器失败');
+  }
+  return data.path || '';
 };
 
 export const getTrainingVersions = async (): Promise<string[]> => {
@@ -69,6 +122,10 @@ export const startFullTraining = async (
   formData.append('output_dir', params.output_dir);
   formData.append('language', params.language);
   formData.append('version', params.version);
+  formData.append('preprocessing_mode', params.preprocessing_mode || 'full');
+  if (params.list_file) {
+    formData.append('list_file', params.list_file);
+  }
   if (params.world_name) {
     formData.append('world_name', params.world_name);
   }

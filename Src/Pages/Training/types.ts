@@ -12,6 +12,7 @@ export interface TrainingPhase {
 }
 
 export interface TrainingParams {
+  preprocessingMode: 'full' | 'existing';
   version: string;
   language: string;
   worldId?: number | null;
@@ -19,6 +20,7 @@ export interface TrainingParams {
   roleId?: number | null;
   characterName: string;
   inputAudioDir: string;
+  listFile: string;
   outputDir: string;
   trainSovits: boolean;
   trainGpt: boolean;
