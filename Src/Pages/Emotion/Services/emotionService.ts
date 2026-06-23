@@ -64,6 +64,8 @@ export interface TranscribeRequestParams {
   audio_path?: string;
   asr_lang?: string;
   asr_model?: string;
+  model_size?: string;
+  precision?: string;
   pure_text?: boolean;
 }
 
@@ -171,8 +173,61 @@ export const deleteRoleEmotion = async (roleId: number, emotionName: string): Pr
   return (data.data?.emotions || []).map(convertRoleEmotion);
 };
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  zh: '中文',
+  yue: '粤语',
+  en: '英语',
+  ja: '日语',
+  ko: '韩语',
+  auto: '自动识别',
+  mix: '混合语种',
+  auto_yue: '混合语种(粤语)',
+  all_zh: '全中文',
+  all_ja: '全日语',
+  all_yue: '全粤语',
+  all_ko: '全韩语',
+};
+
+const normalizeAsrLanguage = (language?: string): string => {
+  const normalized = (language || 'zh').trim().toLowerCase();
+  if (!normalized) return 'zh';
+  if (normalized === 'all_zh') return 'zh';
+  if (normalized === 'all_ja') return 'ja';
+  if (normalized === 'all_yue') return 'yue';
+  if (normalized === 'all_ko') return 'ko';
+  if (normalized === 'mix' || normalized === 'auto_yue') return 'auto';
+  return normalized;
+};
+
+export const formatReferenceLanguageName = (language?: string): string => {
+  const normalized = (language || '').trim().toLowerCase();
+  return normalized ? (LANGUAGE_LABELS[normalized] || normalized) : '未设置';
+};
+
 export const getReferenceTextLanguages = async (): Promise<string[]> => {
-  return ['zh', 'en', 'ja', 'mix'];
+  return ['zh', 'yue', 'en', 'ja', 'ko', 'auto'];
+};
+
+export const getTranscribeConfigForLanguage = (language?: string): Pick<
+  TranscribeRequestParams,
+  'asr_lang' | 'asr_model' | 'model_size' | 'precision'
+> => {
+  const asrLanguage = normalizeAsrLanguage(language);
+  if (asrLanguage === 'zh' || asrLanguage === 'yue') {
+    return {
+      asr_lang: asrLanguage,
+      asr_model: 'funasr',
+      model_size: 'large',
+      precision: 'float32',
+    };
+  }
+
+  return {
+    asr_lang: asrLanguage || 'auto',
+    asr_model: 'faster_whisper',
+    model_size: 'large-v3',
+    precision: 'float16',
+  };
 };
 
 export const getRoleWorkspaces = async (): Promise<RoleWorkspaceInfo[]> => {
@@ -233,6 +288,12 @@ export const transcribeAudio = async (params: TranscribeRequestParams): Promise<
   const formData = new FormData();
   formData.append('language', params.asr_lang || 'zh');
   formData.append('model_type', params.asr_model === 'faster_whisper' ? 'faster_whisper' : 'funasr');
+  if (params.model_size) {
+    formData.append('model_size', params.model_size);
+  }
+  if (params.precision) {
+    formData.append('precision', params.precision);
+  }
   if (params.audio_file) {
     formData.append('audio_file', params.audio_file, params.audio_file.name);
   }

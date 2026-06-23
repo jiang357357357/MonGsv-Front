@@ -2,6 +2,15 @@ import React from 'react';
 import { FolderInput, FolderOutput, Languages } from 'lucide-react';
 import { TrainingParams } from '../../types';
 
+const LANGUAGE_OPTIONS = [
+  { value: 'zh', label: '中文' },
+  { value: 'yue', label: '粤语' },
+  { value: 'en', label: '英语' },
+  { value: 'ja', label: '日语' },
+  { value: 'ko', label: '韩语' },
+  { value: 'auto', label: '自动识别' },
+] as const;
+
 interface TrainingDatasetPageProps {
   params: TrainingParams;
   isTraining: boolean;
@@ -74,12 +83,11 @@ const TrainingDatasetPage: React.FC<TrainingDatasetPageProps> = ({
                 disabled={isTraining}
                 className="theme-input flex-1 rounded-lg px-3 py-2 text-sm disabled:opacity-50"
               >
-                <option value="zh">zh</option>
-                <option value="yue">yue</option>
-                <option value="en">en</option>
-                <option value="ja">ja</option>
-                <option value="ko">ko</option>
-                <option value="auto">auto</option>
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

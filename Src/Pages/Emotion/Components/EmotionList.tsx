@@ -2,6 +2,7 @@ import React from 'react';
 import { Smile, Plus, Loader2 } from 'lucide-react';
 import { EmotionInfo } from '../types';
 import CustomSelect from './CustomSelect';
+import { formatReferenceLanguageName } from '../Services/emotionService';
 
 interface EmotionListProps {
   emotions: EmotionInfo[];
@@ -22,7 +23,7 @@ const EmotionList: React.FC<EmotionListProps> = ({
 }) => {
   const emotionOptions = emotions.map(emo => ({
     id: emo.emotion,
-    name: `${emo.emotion} ${emo.text_language ? `(${emo.text_language})` : ''}`,
+    name: `${emo.emotion} ${emo.text_language ? `(${formatReferenceLanguageName(emo.text_language)})` : ''}`,
   }));
 
   return (

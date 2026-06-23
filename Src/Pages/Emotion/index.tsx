@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Smile, Globe, Layers, User } from 'lucide-react';
+import { Smile, Globe, Layers, User, Plus } from 'lucide-react';
 import CustomSelect from './Components/CustomSelect';
 
 import { 
@@ -265,7 +265,7 @@ const EmotionConfigView: React.FC = () => {
   useEffect(() => {
     if (currentEmotionInfo) {
       setEditText(currentEmotionInfo.text);
-      setEditTextLanguage(currentEmotionInfo.text_language || 'zh');
+      setEditTextLanguage(currentEmotionInfo.text_language || selectedRole?.language || 'zh');
     } else {
       setEditText('');
       setEditTextLanguage('');
@@ -283,7 +283,7 @@ const EmotionConfigView: React.FC = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [selectedEmotion, currentEmotionInfo]);
+  }, [selectedEmotion, currentEmotionInfo, selectedRole?.language]);
 
   const handleVersionChange = (versionId: string) => {
     setSelectedVersionId(versionId);
@@ -584,10 +584,22 @@ const EmotionConfigView: React.FC = () => {
                   <Smile className="w-12 h-12 theme-kicker group-hover:theme-accent-text transition-colors duration-500" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h3 className="theme-title text-sm font-black uppercase tracking-[0.3em]">等待矩阵注入</h3>
+                  <h3 className="theme-title text-sm font-black uppercase tracking-[0.3em]">
+                    {selectedCharacterName && selectedVersionId ? '暂无情感配置' : '等待矩阵注入'}
+                  </h3>
                   <p className="theme-kicker text-[10px] font-bold uppercase tracking-widest">
-                    {!selectedWorldId ? '请先选择世界' : !selectedCharacterName ? '请选择角色' : !selectedVersionId ? '请选择版本' : '请选择左侧列表中的情感进行配置'}
+                    {!selectedWorldId ? '请先选择世界' : !selectedCharacterName ? '请选择角色' : !selectedVersionId ? '请选择版本' : '点击下方按钮为当前角色添加参考情感'}
                   </p>
+                  {selectedCharacterName && selectedVersionId && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="theme-button-primary mx-auto mt-6 flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      添加情感配置
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -603,6 +615,7 @@ const EmotionConfigView: React.FC = () => {
            onAdd={handleAddNewEmotion}
            version={selectedVersionId}
            characterName={selectedCharacterName}
+           defaultLanguage={selectedRole?.language || 'zh'}
            slicedDirectory={selectedSlicedDirectory}
            slicedAudioFiles={selectedSlicedAudioFiles}
            existingEmotions={emotions.map(e => e.emotion)}

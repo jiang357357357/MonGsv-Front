@@ -37,6 +37,15 @@ import TrainingParamsSection from './Components/TrainingParamsSection';
 
 const logger = createLogger('pages/training', 'index');
 
+const LANGUAGE_OPTIONS = [
+  { value: 'zh', label: '中文' },
+  { value: 'yue', label: '粤语' },
+  { value: 'en', label: '英语' },
+  { value: 'ja', label: '日语' },
+  { value: 'ko', label: '韩语' },
+  { value: 'auto', label: '自动识别' },
+] as const;
+
 const trimTrailingSeparators = (value: string): string => value.replace(/[\\\/]+$/, '');
 
 const dirnameFromPath = (value: string): string => {
@@ -86,6 +95,90 @@ const buildListFilePath = (workspace: RoleWorkspaceInfo | null, currentValue: st
 
 const normalizePathSegment = (value: string): string =>
   value.trim().replace(/[\\/:*?"<>|]+/g, '_');
+
+const AUDIO_FILE_EXTENSIONS = new Set(['wav', 'mp3', 'flac', 'm4a', 'ogg', 'aac', 'wma', 'opus']);
+
+const isAudioFile = (file: File): boolean => {
+  if (file.type.startsWith('audio/')) {
+    return true;
+  }
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  return Boolean(extension && AUDIO_FILE_EXTENSIONS.has(extension));
+};
+
+type BrowserFileSystemEntry = {
+  isFile: boolean;
+  isDirectory: boolean;
+  name: string;
+};
+
+type BrowserFileSystemFileEntry = BrowserFileSystemEntry & {
+  file: (success: (file: File) => void, error?: (error: DOMException) => void) => void;
+};
+
+type BrowserFileSystemDirectoryReader = {
+  readEntries: (
+    success: (entries: BrowserFileSystemEntry[]) => void,
+    error?: (error: DOMException) => void,
+  ) => void;
+};
+
+type BrowserFileSystemDirectoryEntry = BrowserFileSystemEntry & {
+  createReader: () => BrowserFileSystemDirectoryReader;
+};
+
+type DataTransferItemWithEntry = DataTransferItem & {
+  webkitGetAsEntry?: () => BrowserFileSystemEntry | null;
+};
+
+const readFileEntry = (entry: BrowserFileSystemFileEntry): Promise<File[]> =>
+  new Promise((resolve) => {
+    entry.file(
+      (file) => resolve(isAudioFile(file) ? [file] : []),
+      () => resolve([]),
+    );
+  });
+
+const readDirectoryEntry = async (entry: BrowserFileSystemDirectoryEntry): Promise<File[]> => {
+  const reader = entry.createReader();
+  const allEntries: BrowserFileSystemEntry[] = [];
+
+  while (true) {
+    const entries = await new Promise<BrowserFileSystemEntry[]>((resolve) => {
+      reader.readEntries(resolve, () => resolve([]));
+    });
+    if (entries.length === 0) {
+      break;
+    }
+    allEntries.push(...entries);
+  }
+
+  const nestedFiles = await Promise.all(allEntries.map(readDroppedEntry));
+  return nestedFiles.flat();
+};
+
+const readDroppedEntry = (entry: BrowserFileSystemEntry): Promise<File[]> => {
+  if (entry.isFile) {
+    return readFileEntry(entry as BrowserFileSystemFileEntry);
+  }
+  if (entry.isDirectory) {
+    return readDirectoryEntry(entry as BrowserFileSystemDirectoryEntry);
+  }
+  return Promise.resolve([]);
+};
+
+const readDroppedAudioFiles = async (dataTransfer: DataTransfer): Promise<File[]> => {
+  const entries = Array.from(dataTransfer.items || [])
+    .map((item) => (item as DataTransferItemWithEntry).webkitGetAsEntry?.())
+    .filter((entry): entry is BrowserFileSystemEntry => Boolean(entry));
+
+  if (entries.length > 0) {
+    const nestedFiles = await Promise.all(entries.map(readDroppedEntry));
+    return nestedFiles.flat();
+  }
+
+  return Array.from(dataTransfer.files || []).filter(isAudioFile);
+};
 
 const buildDerivedTrainingPaths = (
   worldName: string,
@@ -400,14 +493,17 @@ const TrainingDashboard: React.FC = () => {
     setSelectedAudioFiles(audioFiles.length > 0 ? audioFiles : [files[0]]);
   };
 
-  const handleAudioDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleAudioDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setIsDraggingAudio(false);
     if (isTraining || !roleName) {
       return;
     }
-    handleAudioSelected(event.dataTransfer.files);
+    const audioFiles = await readDroppedAudioFiles(event.dataTransfer);
+    if (audioFiles.length > 0) {
+      setSelectedAudioFiles(audioFiles);
+    }
   };
 
   const selectedAudioFile = selectedAudioFiles[0] ?? null;
@@ -635,12 +731,11 @@ const TrainingDashboard: React.FC = () => {
               disabled={isTraining}
               className="theme-input w-full rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black disabled:opacity-50"
             >
-              <option value="zh">zh</option>
-              <option value="yue">yue</option>
-              <option value="en">en</option>
-              <option value="ja">ja</option>
-              <option value="ko">ko</option>
-              <option value="auto">auto</option>
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

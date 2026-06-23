@@ -2,7 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Smile, Mic, Music, Plus, X, AlertCircle, Loader2, Waves, Globe } from 'lucide-react';
 import AudioPlayer from './AudioPlayer';
-import { transcribeAudio, getAudioFileUrl, getReferenceTextLanguages } from '../Services/emotionService';
+import {
+  formatReferenceLanguageName,
+  getAudioFileUrl,
+  getReferenceTextLanguages,
+  getTranscribeConfigForLanguage,
+  transcribeAudio,
+} from '../Services/emotionService';
 import CustomSelect from './CustomSelect';
 
 interface AddEmotionModalProps {
@@ -17,6 +23,7 @@ interface AddEmotionModalProps {
   }) => Promise<void>;
   version: string;
   characterName: string;
+  defaultLanguage?: string;
   slicedDirectory?: string;
   slicedAudioFiles?: string[];
   existingEmotions: string[];
@@ -30,6 +37,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
   onAdd,
   version,
   characterName,
+  defaultLanguage = 'zh',
   slicedDirectory = '',
   slicedAudioFiles = [],
   existingEmotions,
@@ -38,7 +46,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
 }) => {
   const [emotionName, setEmotionName] = useState('');
   const [emotionText, setEmotionText] = useState('');
-  const [textLanguage, setTextLanguage] = useState('zh');
+  const [textLanguage, setTextLanguage] = useState(defaultLanguage || 'zh');
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['zh']);
   const [isLoadingLanguages, setIsLoadingLanguages] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -48,7 +56,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const languageOptions = availableLanguages.map(lang => ({ id: lang, name: lang }));
+  const languageOptions = availableLanguages.map(lang => ({ id: lang, name: formatReferenceLanguageName(lang) }));
   const slicedAudioOptions = slicedAudioFiles.map((path) => ({
     id: path,
     name: path.split(/[\\/]/).pop() || path,
@@ -67,7 +75,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
           
           setAvailableLanguages(languages);
           if (!languages.includes(textLanguage)) {
-            setTextLanguage(languages[0] || 'zh');
+            setTextLanguage(languages.includes(defaultLanguage) ? defaultLanguage : languages[0] || 'zh');
           }
         } catch (err) {
           console.error('加载参考列表失败', err);
@@ -78,14 +86,14 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
       };
       loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, defaultLanguage]);
 
   // 重置表单当模态框关闭时
   useEffect(() => {
     if (!isOpen) {
       setEmotionName('');
       setEmotionText('');
-      setTextLanguage('zh');
+      setTextLanguage(defaultLanguage || 'zh');
       setAudioFile(null);
       setSelectedSlicedAudioPath('');
       if (audioFileUrl) {
@@ -97,7 +105,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
       }
       onErrorChange(null);
     }
-  }, [isOpen, audioFileUrl, onErrorChange]);
+  }, [isOpen, audioFileUrl, onErrorChange, defaultLanguage]);
 
   // 清理 blob URL
   useEffect(() => {
@@ -174,8 +182,8 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
     setIsTranscribing(true);
     try {
       const request = audioFile
-        ? { audio_file: audioFile, asr_lang: 'zh' as const }
-        : { audio_path: selectedSlicedAudioPath || undefined, asr_lang: 'zh' as const };
+        ? { audio_file: audioFile, ...getTranscribeConfigForLanguage(textLanguage) }
+        : { audio_path: selectedSlicedAudioPath || undefined, ...getTranscribeConfigForLanguage(textLanguage) };
 
       const result = await transcribeAudio(request);
       

@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Mic, FileAudio, Save, Trash2, Loader2, CheckCircle2, AlertCircle, X, Upload, Music, Waves, Globe } from 'lucide-react';
 import { EmotionInfo } from '../types';
 import AudioPlayer from './AudioPlayer';
-import { getAudioFileUrl, transcribeAudio, getReferenceTextLanguages } from '../Services/emotionService';
+import {
+  formatReferenceLanguageName,
+  getAudioFileUrl,
+  getReferenceTextLanguages,
+  getTranscribeConfigForLanguage,
+  transcribeAudio,
+} from '../Services/emotionService';
 import { createLogger } from '../../../../System/Log/logger';
 import CustomSelect from './CustomSelect';
 
@@ -57,7 +63,7 @@ const EmotionEditor: React.FC<EmotionEditorProps> = ({
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['zh']);
   const [isLoadingLanguages, setIsLoadingLanguages] = useState(false);
 
-  const languageOptions = availableLanguages.map(lang => ({ id: lang, name: lang }));
+  const languageOptions = availableLanguages.map(lang => ({ id: lang, name: formatReferenceLanguageName(lang) }));
 
   // 加载参考文本语言列表
   useEffect(() => {
@@ -78,16 +84,19 @@ const EmotionEditor: React.FC<EmotionEditorProps> = ({
   const handleTranscribe = async (audioFileOrPath?: string | File) => {
     setIsTranscribing(true);
     try {
-      let request: { audio_file?: File; audio_path?: string; asr_lang: string } | null = null;
+      let request: Parameters<typeof transcribeAudio>[0] | null = null;
+      const transcribeConfig = getTranscribeConfigForLanguage(
+        editTextLanguage || emotionInfo.text_language || 'auto',
+      );
 
       if (audioFileOrPath instanceof File) {
-        request = { audio_file: audioFileOrPath, asr_lang: 'zh' };
+        request = { audio_file: audioFileOrPath, ...transcribeConfig };
       } else if (typeof audioFileOrPath === 'string' && audioFileOrPath.trim()) {
-        request = { audio_path: audioFileOrPath.trim(), asr_lang: 'zh' };
+        request = { audio_path: audioFileOrPath.trim(), ...transcribeConfig };
       } else if (selectedFile) {
-        request = { audio_file: selectedFile, asr_lang: 'zh' };
+        request = { audio_file: selectedFile, ...transcribeConfig };
       } else if (emotionInfo.audio_files.length > 0) {
-        request = { audio_path: emotionInfo.audio_files[0], asr_lang: 'zh' };
+        request = { audio_path: emotionInfo.audio_files[0], ...transcribeConfig };
       }
 
       if (!request) {
@@ -153,7 +162,7 @@ const EmotionEditor: React.FC<EmotionEditorProps> = ({
                     <span>{version}</span>
                     <span>•</span>
                     <span className="theme-tag-amber px-1.5 py-0.5 rounded font-sans font-bold">
-                      {emotionInfo.text_language || 'zh'}
+                      {formatReferenceLanguageName(emotionInfo.text_language || editTextLanguage || 'zh')}
                     </span>
                   </div>
                 </div>
