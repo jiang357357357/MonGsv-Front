@@ -338,7 +338,7 @@ const ManagementDashboard: React.FC = () => {
 									onCreateWorld={handleCreateWorld}
 									worldError={worldError}
 									isLoadingWorlds={isLoadingWorlds}
-									activeTab={activeTab === 'roles' ? 'roles' : 'worlds'}
+									activeTab="worlds"
 									onTabChange={(tab) => handleTabChange(tab)}
 								/>
 							)}
@@ -356,7 +356,6 @@ const ManagementDashboard: React.FC = () => {
 										setCurrentGptId(role.gpt_model_id || role.gpt_model?.id);
 										setCurrentSovId(role.sov_model_id || role.sov_model?.id);
 										setSelectedRoleVersion(role.version || '');
-										setIsImportMode(false); // 编辑模式暂不支持导入模式
 										logger.info('准备编辑角色', { role });
 									}}
 									onUpdateRole={handleUpdateRole}
@@ -367,8 +366,14 @@ const ManagementDashboard: React.FC = () => {
 									isLoadingRoles={isLoadingRoles}
 									worlds={worlds}
 									versions={versions}
+									gptModels={gptModels}
+									sovModels={sovModels}
 									currentRoleWorldName={currentWorldName}
 									onRoleWorldChange={(value) => applyWorld(value, { preserveRoleDraft: true })}
+									gptInputId={currentGptId}
+									onGptInputChange={setCurrentGptId}
+									sovInputId={currentSovId}
+									onSovInputChange={setCurrentSovId}
 									gptFile={gptFile}
 									onGptFileChange={setGptFile}
 									sovFile={sovFile}

@@ -68,7 +68,6 @@ const SettingsPanel: React.FC = () => {
                               {selectedCategory === 'models' && '模型仓库管理'}
                               {selectedCategory === 'dataset' && '数据集配置'}
                               {selectedCategory === 'audio' && '参考音频库'}
-                              {selectedCategory === 'api' && 'API配置'}
                           </h3>
                           <p className="theme-kicker text-xs font-mono uppercase tracking-wide">
                           /ROOT/{selectedCategory.toUpperCase()}
@@ -160,4 +159,3 @@ const SettingsPanel: React.FC = () => {
 };
 
 export default SettingsPanel;
-

@@ -428,7 +428,7 @@ export const updateRole = async (payload: UpdateRolePayload): Promise<CreateRole
 	return data;
 };
 
-export const deleteWorld = async (payload: WorldInfo): Promise<DeleteWorldResponse> => {
+export const deleteWorld = async (payload: DeleteWorldPayload): Promise<DeleteWorldResponse> => {
 	const baseUrl = getApiBaseUrl();
 	const apiUrl = `${baseUrl}/api/world/delete/`;
 	const response = await fetch(apiUrl, {
@@ -456,7 +456,7 @@ export const deleteWorld = async (payload: WorldInfo): Promise<DeleteWorldRespon
 	return data;
 };
 
-export const deleteRole = async (payload: RoleInfo): Promise<DeleteRoleResponse> => {
+export const deleteRole = async (payload: DeleteRolePayload): Promise<DeleteRoleResponse> => {
 	const baseUrl = getApiBaseUrl();
 	const apiUrl = `${baseUrl}/api/role/delete/`;
 	const response = await fetch(apiUrl, {

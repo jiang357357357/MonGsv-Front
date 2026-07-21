@@ -169,8 +169,8 @@ const readDroppedEntry = (entry: BrowserFileSystemEntry): Promise<File[]> => {
 
 const readDroppedAudioFiles = async (dataTransfer: DataTransfer): Promise<File[]> => {
   const entries = Array.from(dataTransfer.items || [])
-    .map((item) => (item as DataTransferItemWithEntry).webkitGetAsEntry?.())
-    .filter((entry): entry is BrowserFileSystemEntry => Boolean(entry));
+    .map((item) => (item as DataTransferItemWithEntry).webkitGetAsEntry?.() as BrowserFileSystemEntry | null | undefined)
+    .filter(Boolean) as BrowserFileSystemEntry[];
 
   if (entries.length > 0) {
     const nestedFiles = await Promise.all(entries.map(readDroppedEntry));

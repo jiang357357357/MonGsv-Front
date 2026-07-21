@@ -19,8 +19,14 @@ interface RolesPageProps {
 	isLoadingRoles: boolean;
 	worlds: WorldInfo[];
 	versions: VersionInfo[];
+	gptModels: ModelInfo[];
+	sovModels: ModelInfo[];
 	currentRoleWorldName: string;
 	onRoleWorldChange: (value: string) => void;
+	gptInputId: number | undefined;
+	onGptInputChange: (id: number | undefined) => void;
+	sovInputId: number | undefined;
+	onSovInputChange: (id: number | undefined) => void;
 	gptFile: File | null;
 	onGptFileChange: (file: File | null) => void;
 	sovFile: File | null;

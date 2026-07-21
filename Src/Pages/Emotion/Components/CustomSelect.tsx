@@ -104,7 +104,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       >
         {label && (
           <span className="theme-subtitle text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5 mb-1">
-            {icon && React.cloneElement(icon as React.ReactElement, { 
+            {icon && React.cloneElement(icon as React.ReactElement<{ className?: string }>, { 
               className: `w-3 h-3 transition-colors ${isOpen ? 'theme-accent-text' : 'theme-subtitle group-hover:text-[var(--color-amber-500)]'}` 
             })}
             {label}
