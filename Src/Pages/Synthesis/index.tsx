@@ -35,7 +35,7 @@ const SynthesisView: React.FC = () => {
   const [selectedCharacterName, setSelectedCharacterName] = useState<string>('');
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
   const [selectedLang, setSelectedLang] = useState('中文');
-  const [selectedCutMethod, setSelectedCutMethod] = useState('凑四句一切');
+  const [selectedCutMethod, setSelectedCutMethod] = useState('按标点符号切');
   const [selectedInferenceMode, setSelectedInferenceMode] = useState('normal');
   const [speedFactor, setSpeedFactor] = useState(1.0);
   
@@ -404,4 +404,3 @@ const SynthesisView: React.FC = () => {
 };
 
 export default SynthesisView;
-
