@@ -247,9 +247,9 @@ const BackendTestPage: React.FC = () => {
     text: '你好，这是推理测试。',
     text_language: 'zh',
     how_to_cut: '按标点符号切',
-    top_k: '20',
-    top_p: '0.6',
-    temperature: '0.6',
+    top_k: '15',
+    top_p: '1.0',
+    temperature: '1.0',
   });
 
   const applyWorkspaceSelection = (workspace: RoleWorkspaceOption) => {
