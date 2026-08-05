@@ -1,7 +1,12 @@
 import { getApiBaseUrl } from '../../../../System/Config';
 import { createLogger } from '../../../../System/Log/logger';
 import { FullTrainingRequest, StartGptTrainingRequest, StartSovitsTrainingRequest } from './trainingRequests';
-import { FullTrainingWorkflowResponse, TrainingLaunchResponse, TrainingStatusResponse } from './trainingResponses';
+import {
+  FullTrainingWorkflowResponse,
+  TrainingLaunchResponse,
+  TrainingStatusResponse,
+  TrainingWorkflowStatus,
+} from './trainingResponses';
 
 const logger = createLogger('pages/training', 'trainingService');
 
@@ -169,6 +174,26 @@ export const getTrainingStatus = async (jobId: string): Promise<TrainingStatusRe
   }
 
   return await response.json() as TrainingStatusResponse;
+};
+
+export const getTrainingWorkflowStatus = async (workflowId: string): Promise<TrainingWorkflowStatus> => {
+  const baseUrl = getApiBaseUrl();
+  const apiUrl = `${baseUrl}/workflow/training/status/${encodeURIComponent(workflowId)}`;
+  const response = await fetch(apiUrl);
+  if (!response.ok) {
+    throw new Error(await parseError(response, `获取训练工作流状态失败: ${workflowId}`));
+  }
+  return await response.json() as TrainingWorkflowStatus;
+};
+
+export const stopTrainingWorkflow = async (workflowId: string): Promise<TrainingWorkflowStatus> => {
+  const baseUrl = getApiBaseUrl();
+  const apiUrl = `${baseUrl}/workflow/training/stop/${encodeURIComponent(workflowId)}`;
+  const response = await fetch(apiUrl, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(await parseError(response, `停止训练工作流失败: ${workflowId}`));
+  }
+  return await response.json() as TrainingWorkflowStatus;
 };
 
 export const startGptTraining = async (params: StartGptTrainingRequest): Promise<TrainingLaunchResponse> => {

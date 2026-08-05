@@ -32,6 +32,8 @@ export interface TrainingParams {
   gpuNumbers?: string;
 }
 
-export type TrainingStepStatus = 'pending' | 'starting' | 'processing' | 'completed' | 'error';
+export type TrainingStepStatus = 'pending' | 'starting' | 'processing' | 'completed' | 'error' | 'stopped' | 'skipped';
+export type TrainingPhaseStatus = 'pending' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'stopped' | 'skipped';
+export type TrainingPhaseStatuses = Record<string, TrainingPhaseStatus>;
 
 export type BackendTrainingStep = 'dataset_prepare' | 'sovits_train' | 'gpt_train';

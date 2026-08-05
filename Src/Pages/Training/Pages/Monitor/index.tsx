@@ -1,11 +1,10 @@
 import React from 'react';
 import TrainingMonitor from '../../Components/TrainingMonitor';
-import { TrainingStepStatus } from '../../types';
+import { TrainingPhaseStatuses, TrainingStepStatus } from '../../types';
 
 interface TrainingMonitorPageProps {
   isTraining: boolean;
-  activePhaseIndex: number;
-  completedPhases: string[];
+  phaseStatuses: TrainingPhaseStatuses;
   error: string | null;
   currentMessage: string;
   getSubStepStatus: (phaseIndex: number, subStepIndex: number) => TrainingStepStatus;
@@ -13,8 +12,7 @@ interface TrainingMonitorPageProps {
 
 const TrainingMonitorPage: React.FC<TrainingMonitorPageProps> = ({
   isTraining,
-  activePhaseIndex,
-  completedPhases,
+  phaseStatuses,
   error,
   currentMessage,
   getSubStepStatus,
@@ -32,8 +30,7 @@ const TrainingMonitorPage: React.FC<TrainingMonitorPageProps> = ({
         <div className="theme-section-soft h-full rounded-xl border p-4">
           <TrainingMonitor
             isTraining={isTraining}
-            activePhaseIndex={activePhaseIndex}
-            completedPhases={completedPhases}
+            phaseStatuses={phaseStatuses}
             error={error}
             currentMessage={currentMessage}
             getSubStepStatus={getSubStepStatus}

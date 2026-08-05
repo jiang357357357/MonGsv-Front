@@ -1,12 +1,11 @@
 import React from 'react';
 import { Check, Loader2, AlertCircle, Cpu } from 'lucide-react';
 import { TRAINING_PHASES } from '../constants';
-import { TrainingStepStatus } from '../types';
+import { TrainingPhaseStatuses, TrainingStepStatus } from '../types';
 
 interface TrainingMonitorProps {
   isTraining: boolean;
-  activePhaseIndex: number;
-  completedPhases: string[];
+  phaseStatuses: TrainingPhaseStatuses;
   error: string | null;
   currentMessage: string;
   getSubStepStatus: (phaseIndex: number, subStepIndex: number) => TrainingStepStatus;
@@ -14,12 +13,15 @@ interface TrainingMonitorProps {
 
 const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
   isTraining,
-  activePhaseIndex,
-  completedPhases,
+  phaseStatuses,
   error,
   currentMessage,
   getSubStepStatus,
 }) => {
+  const completedCount = TRAINING_PHASES.filter((phase) => phaseStatuses[phase.id] === 'completed').length;
+  const enabledCount = TRAINING_PHASES.filter((phase) => phaseStatuses[phase.id] !== 'skipped').length;
+  const allFinished = enabledCount > 0 && completedCount === enabledCount;
+
   return (
     <div className="h-full flex flex-col">
       {/* 头部状态栏 */}
@@ -31,9 +33,9 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {completedPhases.length > 0 && (
+          {completedCount > 0 && (
             <span className="theme-kicker text-[10px]">
-              完成: {completedPhases.length}/{TRAINING_PHASES.length}
+              完成: {completedCount}/{enabledCount}
             </span>
           )}
         </div>
@@ -64,9 +66,27 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
       {/* 训练阶段列表 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
         {TRAINING_PHASES.map((phase, index) => {
-          const isActive = activePhaseIndex === index;
-          const isCompleted = completedPhases.includes(phase.id);
-          const isPending = index > activePhaseIndex && !isCompleted;
+          const phaseStatus = phaseStatuses[phase.id] || 'pending';
+          const isActive = phaseStatus === 'queued' || phaseStatus === 'starting' || phaseStatus === 'running';
+          const isCompleted = phaseStatus === 'completed';
+          const isFailed = phaseStatus === 'failed';
+          const isStopped = phaseStatus === 'stopped';
+          const isSkipped = phaseStatus === 'skipped';
+          const statusLabel = phaseStatus === 'queued'
+            ? '排队中'
+            : phaseStatus === 'starting'
+            ? '启动中'
+            : phaseStatus === 'running'
+            ? '进行中'
+            : isCompleted
+            ? '已完成'
+            : isFailed
+            ? '失败'
+            : isStopped
+            ? '已停止'
+            : isSkipped
+            ? '未启用'
+            : '待处理';
 
           return (
             <div
@@ -74,6 +94,8 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
               className={`p-3 rounded-lg border transition-all ${
                 isActive
                   ? 'theme-card border-[var(--color-amber-400)]'
+                  : isFailed
+                  ? 'theme-status-block-danger'
                   : isCompleted
                   ? 'theme-card'
                   : 'theme-section-soft'
@@ -97,7 +119,7 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
                   <span className={`text-[10px] ${
                     isActive ? 'theme-accent-text' : isCompleted ? 'theme-kicker' : 'text-[var(--color-gray-300)]'
                   }`}>
-                    {isActive ? '进行中' : isCompleted ? '已完成' : '待处理'}
+                    {statusLabel}
                   </span>
                 </div>
               </div>
@@ -113,6 +135,8 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
                           ? 'bg-[var(--color-amber-300)]'
                           : status === 'completed'
                           ? 'bg-[var(--color-success-500)]'
+                          : status === 'error'
+                          ? 'bg-[var(--color-danger-500)]'
                           : 'bg-[var(--color-gray-200)]'
                       }`} />
                       <span className={`text-[10px] ${
@@ -120,6 +144,8 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
                           ? 'theme-accent-text font-medium'
                           : status === 'completed'
                           ? 'theme-kicker line-through'
+                          : status === 'error'
+                          ? 'theme-status-danger font-medium'
                           : 'text-[var(--color-gray-300)]'
                       }`}>
                         {step.label}
@@ -134,7 +160,7 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
       </div>
 
       {/* 完成提示 */}
-      {completedPhases.length === TRAINING_PHASES.length && completedPhases.length > 0 && (
+      {allFinished && (
         <div className="theme-status-block-info mt-4 p-4 rounded-lg">
           <div className="flex items-center gap-2">
             <Check className="theme-status-success w-5 h-5" />

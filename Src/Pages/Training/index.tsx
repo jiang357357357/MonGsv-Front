@@ -277,7 +277,7 @@ const TrainingDashboard: React.FC = () => {
 
   const {
     isTraining,
-    activePhaseIndex,
+    phaseStatuses,
     completedPhases,
     error,
     currentMessage,
@@ -1015,8 +1015,7 @@ const TrainingDashboard: React.FC = () => {
       <div className="min-h-[560px]">
         <TrainingMonitor
           isTraining={isTraining}
-          activePhaseIndex={activePhaseIndex}
-          completedPhases={completedPhases}
+          phaseStatuses={phaseStatuses}
           error={error}
           currentMessage={currentMessage}
           getSubStepStatus={getSubStepStatus}

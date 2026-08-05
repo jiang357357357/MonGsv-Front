@@ -48,9 +48,35 @@ export interface FullTrainingWorkflowResponse {
   project_name: string;
   project_root: string;
   preprocess_steps: GatewayWorkflowStep[];
-  training_steps: GatewayWorkflowStep[];
+  training_workflow: TrainingWorkflowStatus;
   steps: GatewayWorkflowStep[];
   next_action?: string;
+}
+
+export type TrainingTargetName = 'gpt' | 'sovits';
+export type TrainingTargetStatus = 'pending' | 'starting' | 'running' | 'completed' | 'failed' | 'stopped';
+export type TrainingWorkflowState = 'queued' | 'running' | 'completed' | 'failed' | 'stopped';
+
+export interface TrainingWorkflowTarget {
+  target: TrainingTargetName;
+  status: TrainingTargetStatus;
+  job_id: string | null;
+  launch: Record<string, unknown> | null;
+  details: TrainingStatusPayload | null;
+  error: string | null;
+}
+
+export interface TrainingWorkflowStatus {
+  workflow_id: string;
+  project_name: string;
+  project_root: string;
+  version: string;
+  order: TrainingTargetName[];
+  status: TrainingWorkflowState;
+  current_target: TrainingTargetName | null;
+  targets: TrainingWorkflowTarget[];
+  dataset: Record<string, unknown>;
+  error: string | null;
 }
 
 export interface TrainingStatusPayload {

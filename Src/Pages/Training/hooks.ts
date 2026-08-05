@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getTrainingStatus, startFullTraining, startGptTraining, startSovitsTraining, stopTrainingJob } from './Services/trainingApi';
-import { GatewayWorkflowStep } from './Services/trainingResponses';
+import {
+  getTrainingStatus,
+  getTrainingWorkflowStatus,
+  startFullTraining,
+  startGptTraining,
+  startSovitsTraining,
+  stopTrainingJob,
+  stopTrainingWorkflow,
+} from './Services/trainingApi';
+import { GatewayWorkflowStep, TrainingWorkflowStatus } from './Services/trainingResponses';
 import { FullTrainingRequest, StartGptTrainingRequest, StartSovitsTrainingRequest } from './Services/trainingRequests';
-import { TrainingParams, TrainingStepStatus } from './types';
+import { TrainingParams, TrainingPhaseStatuses, TrainingStepStatus } from './types';
 import { TRAINING_PHASES } from './constants';
 import { createLogger } from '../../../System/Log/logger';
 
@@ -23,6 +31,15 @@ interface ActiveJob {
   type: 'gpt' | 'sovits';
   phaseIndex: number;
 }
+
+const TARGET_TO_PHASE_ID = {
+  sovits: 'phase6',
+  gpt: 'phase7',
+} as const;
+
+const createInitialPhaseStatuses = (): TrainingPhaseStatuses => Object.fromEntries(
+  TRAINING_PHASES.map((phase) => [phase.id, 'pending']),
+) as TrainingPhaseStatuses;
 
 const normalizeStepName = (step: string): string => {
   const mapped: Record<string, string> = {
@@ -61,30 +78,30 @@ const buildDerivedTrainingPaths = (
 
 export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[] = []) => {
   const [isTraining, setIsTraining] = useState(false);
-  const [activePhaseIndex, setActivePhaseIndex] = useState(-1);
-  const [completedPhases, setCompletedPhases] = useState<string[]>([]);
+  const [phaseStatuses, setPhaseStatuses] = useState<TrainingPhaseStatuses>(createInitialPhaseStatuses);
   const [error, setError] = useState<string | null>(null);
   const [currentMessage, setCurrentMessage] = useState<string>('');
-  const [activeSubStepIndex, setActiveSubStepIndex] = useState(-1);
 
   const activeJobsRef = useRef<ActiveJob[]>([]);
+  const activeWorkflowIdRef = useRef<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const stoppedRef = useRef(false);
 
+  const completedPhases = TRAINING_PHASES
+    .filter((phase) => phaseStatuses[phase.id] === 'completed')
+    .map((phase) => phase.id);
+
   const getSubStepStatus = useCallback((phaseIndex: number, subStepIndex: number): TrainingStepStatus => {
-    if (phaseIndex < activePhaseIndex || completedPhases.includes(TRAINING_PHASES[phaseIndex]?.id)) {
-      return 'completed';
-    }
-    if (phaseIndex === activePhaseIndex) {
-      if (subStepIndex < activeSubStepIndex) {
-        return 'completed';
-      }
-      if (subStepIndex === activeSubStepIndex) {
-        return 'processing';
-      }
-    }
+    const phaseId = TRAINING_PHASES[phaseIndex]?.id;
+    const status = phaseId ? phaseStatuses[phaseId] : 'pending';
+    if (status === 'completed') return 'completed';
+    if (status === 'failed') return subStepIndex === 1 ? 'error' : subStepIndex === 0 ? 'completed' : 'pending';
+    if (status === 'stopped') return subStepIndex === 1 ? 'stopped' : subStepIndex === 0 ? 'completed' : 'pending';
+    if (status === 'skipped') return 'skipped';
+    if (status === 'running') return subStepIndex === 0 ? 'completed' : subStepIndex === 1 ? 'processing' : 'pending';
+    if (status === 'starting') return subStepIndex === 0 ? 'processing' : 'pending';
     return 'pending';
-  }, [activePhaseIndex, activeSubStepIndex, completedPhases]);
+  }, [phaseStatuses]);
 
   const clearPolling = useCallback(() => {
     if (pollTimerRef.current !== null) {
@@ -98,23 +115,17 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
     if (!phaseId) {
       return;
     }
-    setCompletedPhases((prev) => (prev.includes(phaseId) ? prev : [...prev, phaseId]));
+    setPhaseStatuses((prev) => ({ ...prev, [phaseId]: 'completed' }));
   }, []);
 
   const applyWorkflowSteps = useCallback((steps: GatewayWorkflowStep[]) => {
-    let lastPhaseIndex = -1;
     for (const step of steps) {
       const normalized = normalizeStepName(step.step);
       const phaseIndex = STAGE_TO_PHASE_MAP[normalized];
       if (phaseIndex === undefined) {
         continue;
       }
-      lastPhaseIndex = Math.max(lastPhaseIndex, phaseIndex);
       markPhaseCompleted(phaseIndex);
-    }
-    if (lastPhaseIndex >= 0) {
-      setActivePhaseIndex(lastPhaseIndex);
-      setActiveSubStepIndex(2);
     }
   }, [markPhaseCompleted]);
 
@@ -130,8 +141,6 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
 
     if (activeJobsRef.current.length === 0) {
       setIsTraining(false);
-      setActivePhaseIndex(-1);
-      setActiveSubStepIndex(-1);
       setCurrentMessage('训练任务已全部结束');
       return;
     }
@@ -153,24 +162,23 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
         if (payload.status === 'running') {
           hasRunning = true;
           remainingJobs.push(job);
-          setActivePhaseIndex(phaseIndex);
-          setActiveSubStepIndex(1);
+          setPhaseStatuses((prev) => ({ ...prev, [TRAINING_PHASES[phaseIndex].id]: 'running' }));
           setCurrentMessage(`${job.type.toUpperCase()} 训练中: ${payload.job_id}`);
           continue;
         }
 
         if (payload.status === 'completed') {
           markPhaseCompleted(phaseIndex);
-          setActivePhaseIndex(phaseIndex);
-          setActiveSubStepIndex(2);
           setCurrentMessage(`${job.type.toUpperCase()} 训练完成`);
           continue;
         }
 
         if (payload.status === 'failed' || payload.status === 'stopped') {
           firstError = payload.error_message || `${job.type.toUpperCase()} 训练失败`;
-          setActivePhaseIndex(phaseIndex);
-          setActiveSubStepIndex(1);
+          setPhaseStatuses((prev) => ({
+            ...prev,
+            [TRAINING_PHASES[phaseIndex].id]: payload.status === 'stopped' ? 'stopped' : 'failed',
+          }));
           break;
         }
       }
@@ -192,8 +200,6 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       }
 
       setIsTraining(false);
-      setActivePhaseIndex(-1);
-      setActiveSubStepIndex(-1);
       setCurrentMessage('训练已全部完成');
     } catch (pollError) {
       const message = pollError instanceof Error ? pollError.message : '查询训练状态失败';
@@ -202,6 +208,68 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       clearPolling();
     }
   }, [clearPolling, markPhaseCompleted, schedulePoll]);
+
+  const applyTrainingWorkflowStatus = useCallback((workflow: TrainingWorkflowStatus) => {
+    setPhaseStatuses((prev) => {
+      const next = { ...prev };
+      for (const target of workflow.targets) {
+        next[TARGET_TO_PHASE_ID[target.target]] = target.status === 'pending' && workflow.status === 'queued'
+          ? 'queued'
+          : target.status;
+      }
+      return next;
+    });
+
+    if (workflow.status === 'queued') {
+      setIsTraining(true);
+      setCurrentMessage(`训练工作流排队中: ${workflow.workflow_id}`);
+      return;
+    }
+
+    if (workflow.status === 'running') {
+      setIsTraining(true);
+      const target = workflow.targets.find((item) => item.target === workflow.current_target);
+      const jobText = target?.job_id ? `: ${target.job_id}` : '';
+      setCurrentMessage(`${workflow.current_target?.toUpperCase() || '训练'} 进行中${jobText}`);
+      return;
+    }
+
+    setIsTraining(false);
+    if (workflow.status === 'completed') {
+      setCurrentMessage('训练已全部完成');
+      setError(null);
+    } else if (workflow.status === 'stopped') {
+      setCurrentMessage('训练工作流已停止');
+    } else {
+      const failedTarget = workflow.targets.find((target) => target.status === 'failed');
+      const message = failedTarget?.error || workflow.error || '训练工作流失败';
+      setCurrentMessage(message);
+      setError(message);
+    }
+  }, []);
+
+  const pollTrainingWorkflow = useCallback(async () => {
+    if (stoppedRef.current || !activeWorkflowIdRef.current) {
+      return;
+    }
+
+    try {
+      const workflow = await getTrainingWorkflowStatus(activeWorkflowIdRef.current);
+      applyTrainingWorkflowStatus(workflow);
+      if (workflow.status === 'queued' || workflow.status === 'running') {
+        schedulePoll(() => {
+          void pollTrainingWorkflow();
+        }, 3000);
+      } else {
+        activeWorkflowIdRef.current = null;
+      }
+    } catch (pollError) {
+      const message = pollError instanceof Error ? pollError.message : '查询训练工作流状态失败';
+      setError(message);
+      setIsTraining(false);
+      clearPolling();
+    }
+  }, [applyTrainingWorkflowStatus, clearPolling, schedulePoll]);
 
   const startTraining = useCallback(async () => {
     if (!params) {
@@ -249,10 +317,12 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
 
     stoppedRef.current = false;
     activeJobsRef.current = [];
+    activeWorkflowIdRef.current = null;
     setIsTraining(true);
-    setActivePhaseIndex(-1);
-    setCompletedPhases([]);
-    setActiveSubStepIndex(-1);
+    const initialStatuses = createInitialPhaseStatuses();
+    if (!params.trainSovits) initialStatuses.phase6 = 'skipped';
+    if (!params.trainGpt) initialStatuses.phase7 = 'skipped';
+    setPhaseStatuses(initialStatuses);
     setError(null);
     setCurrentMessage('准备启动训练引导...');
 
@@ -278,38 +348,21 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
 
       const workflowResult = await startFullTraining(requestParams);
       applyWorkflowSteps(workflowResult.preprocess_steps || []);
-
-      const trainingJobs: ActiveJob[] = (workflowResult.training_steps || [])
-        .map((step) => {
-          const normalizedStep = normalizeStepName(step.step);
-          const phaseIndex = STAGE_TO_PHASE_MAP[normalizedStep];
-          const jobId = typeof step.result?.job_id === 'string' ? step.result.job_id : '';
-          const type = normalizedStep === 'gpt_training' ? 'gpt' : normalizedStep === 'sovits_training' ? 'sovits' : null;
-          if (!jobId || phaseIndex === undefined || !type) {
-            return null;
-          }
-          return { jobId, type, phaseIndex } as ActiveJob;
-        })
-        .filter((item): item is ActiveJob => item !== null);
-
-      if (trainingJobs.length === 0) {
-        setIsTraining(false);
-        setActivePhaseIndex(-1);
-        setActiveSubStepIndex(-1);
-        setCurrentMessage(workflowResult.message || '预处理完成，未启动训练任务');
-        return;
+      const workflow = workflowResult.training_workflow;
+      if (!workflow?.workflow_id) {
+        throw new Error('完整训练响应未返回 workflow_id');
       }
 
-      activeJobsRef.current = trainingJobs;
-      setCurrentMessage('预处理完成，正在启动训练监控...');
-      await pollTrainingStatuses();
+      activeWorkflowIdRef.current = workflow.workflow_id;
+      applyTrainingWorkflowStatus(workflow);
+      await pollTrainingWorkflow();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '启动训练失败';
       setError(errorMessage);
       setIsTraining(false);
       logger.error('启动训练失败', { error: err });
     }
-  }, [applyWorkflowSteps, audioFiles, params, pollTrainingStatuses]);
+  }, [applyTrainingWorkflowStatus, applyWorkflowSteps, audioFiles, params, pollTrainingWorkflow]);
 
   const startSingleTraining = useCallback(async (target: 'gpt' | 'sovits') => {
     if (!params) {
@@ -337,10 +390,11 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
 
     stoppedRef.current = false;
     activeJobsRef.current = [];
+    activeWorkflowIdRef.current = null;
     setIsTraining(true);
     setError(null);
     setCurrentMessage(`准备启动${target === 'gpt' ? 'GPT' : 'SoVITS'}训练...`);
-    setCompletedPhases([]);
+    setPhaseStatuses(createInitialPhaseStatuses());
 
     try {
       const expRoot = params.outputDir.trim();
@@ -358,7 +412,6 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
           throw new Error(result.message || 'GPT训练未返回任务ID');
         }
         job = { jobId: result.job_id, type: 'gpt', phaseIndex: 6 };
-        setActivePhaseIndex(6);
       } else {
         const requestParams: StartSovitsTrainingRequest = {
           exp_name: roleName,
@@ -372,10 +425,11 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
           throw new Error(result.message || 'SoVITS训练未返回任务ID');
         }
         job = { jobId: result.job_id, type: 'sovits', phaseIndex: 5 };
-        setActivePhaseIndex(5);
       }
 
-      setActiveSubStepIndex(0);
+      if (job) {
+        setPhaseStatuses((prev) => ({ ...prev, [TRAINING_PHASES[job.phaseIndex].id]: 'starting' }));
+      }
       activeJobsRef.current = job ? [job] : [];
       await pollTrainingStatuses();
     } catch (err) {
@@ -390,22 +444,42 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
     try {
       stoppedRef.current = true;
       clearPolling();
+      const workflowId = activeWorkflowIdRef.current;
       const jobs = [...activeJobsRef.current];
-      activeJobsRef.current = [];
 
-      await Promise.allSettled(jobs.map((job) => stopTrainingJob(job.jobId)));
+      if (workflowId) {
+        const workflow = await stopTrainingWorkflow(workflowId);
+        applyTrainingWorkflowStatus(workflow);
+        activeWorkflowIdRef.current = null;
+      } else {
+        const results = await Promise.allSettled(jobs.map((job) => stopTrainingJob(job.jobId)));
+        const rejected = results.find((result) => result.status === 'rejected');
+        if (rejected?.status === 'rejected') {
+          throw rejected.reason;
+        }
+        activeJobsRef.current = [];
+        setPhaseStatuses((prev) => {
+          const next = { ...prev };
+          for (const job of jobs) next[TRAINING_PHASES[job.phaseIndex].id] = 'stopped';
+          return next;
+        });
+      }
 
       setIsTraining(false);
-      setActivePhaseIndex(-1);
-      setActiveSubStepIndex(-1);
       setCurrentMessage('训练停止请求已发送');
-      logger.info('训练停止请求已发送', { jobs: jobs.map((job) => job.jobId) });
+      logger.info('训练停止请求已发送', { workflowId, jobs: jobs.map((job) => job.jobId) });
     } catch (err) {
+      stoppedRef.current = false;
       const errorMessage = err instanceof Error ? err.message : '停止训练失败';
       setError(errorMessage);
       logger.error('停止训练失败', { error: err });
+      if (activeWorkflowIdRef.current) {
+        void pollTrainingWorkflow();
+      } else if (activeJobsRef.current.length > 0) {
+        void pollTrainingStatuses();
+      }
     }
-  }, [clearPolling]);
+  }, [applyTrainingWorkflowStatus, clearPolling, pollTrainingStatuses, pollTrainingWorkflow]);
 
   const toggleTraining = useCallback(() => {
     if (isTraining) {
@@ -413,9 +487,7 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
     } else {
       setError(null);
       setCurrentMessage('');
-      setActivePhaseIndex(-1);
-      setCompletedPhases([]);
-      setActiveSubStepIndex(-1);
+      setPhaseStatuses(createInitialPhaseStatuses());
       void startTraining();
     }
   }, [handleStopTraining, isTraining, startTraining]);
@@ -427,11 +499,10 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
 
   return {
     isTraining,
-    activePhaseIndex,
+    phaseStatuses,
     completedPhases,
     error,
     currentMessage,
-    activeSubStepIndex,
     toggleTraining,
     startGptOnly: () => void startSingleTraining('gpt'),
     startSovitsOnly: () => void startSingleTraining('sovits'),
