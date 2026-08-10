@@ -6,6 +6,7 @@ import SettingsPanel from './Src/Pages/Settings';
 import EmotionConfigView from './Src/Pages/Emotion';
 import ManagementDashboard from './Src/Pages/Management';
 import BackendTestPage from './Src/Pages/BackendTest';
+import ProfileSettings from './Src/Pages/Profile';
 import { AppView } from './types';
 import { createLogger } from './System/Log/logger';
 
@@ -30,6 +31,8 @@ const App: React.FC = () => {
         return <EmotionConfigView />;
       case AppView.BACKEND_TEST:
         return <BackendTestPage />;
+      case AppView.PROFILE:
+        return <ProfileSettings />;
       case AppView.SETTINGS:
         return <SettingsPanel />;
       case AppView.MANAGEMENT:

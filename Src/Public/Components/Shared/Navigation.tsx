@@ -6,6 +6,7 @@ import {
   BrainCircuit,
   FolderCog,
   Settings2,
+  UserRound,
 } from 'lucide-react';
 import { AppView } from '../../../../types';
 
@@ -45,6 +46,11 @@ const NAV_ITEMS: NavItem[] = [
     view: AppView.MANAGEMENT,
     label: '资源管理',
     icon: FolderCog,
+  },
+  {
+    view: AppView.PROFILE,
+    label: '个人配置',
+    icon: UserRound,
   },
   {
     view: AppView.SETTINGS,
