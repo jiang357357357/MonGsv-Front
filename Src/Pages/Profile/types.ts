@@ -1,7 +1,6 @@
 export type ProfileTab = 'profile' | 'voiceprint';
 
 export interface PersonalProfile {
-  speakerId: string;
   displayName: string;
   language: 'auto' | 'zh' | 'en' | 'ja';
   voiceprintThreshold: number;

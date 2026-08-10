@@ -32,7 +32,6 @@ import './profile-settings.css';
 const STORAGE_KEY = 'monGsvPersonalProfile';
 
 const DEFAULT_PROFILE: PersonalProfile = {
-  speakerId: '',
   displayName: '',
   language: 'zh',
   voiceprintThreshold: 0.75,
@@ -44,7 +43,6 @@ const readStoredProfile = (): PersonalProfile => {
     if (!raw) return DEFAULT_PROFILE;
     const stored = JSON.parse(raw) as Partial<PersonalProfile>;
     return {
-      speakerId: String(stored.speakerId || ''),
       displayName: String(stored.displayName || ''),
       language: ['auto', 'zh', 'en', 'ja'].includes(String(stored.language))
         ? (stored.language as PersonalProfile['language'])
@@ -69,8 +67,8 @@ const ProfileSettings: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentSpeaker = useMemo(
-    () => speakers.find((speaker) => speaker.speaker_id === savedProfile.speakerId) || null,
-    [savedProfile.speakerId, speakers],
+    () => speakers[0] || null,
+    [speakers],
   );
 
   const refreshSpeakers = useCallback(async (showSuccess = false) => {
@@ -100,12 +98,11 @@ const ProfileSettings: React.FC = () => {
   const saveProfile = () => {
     const normalized = {
       ...profile,
-      speakerId: profile.speakerId.trim(),
       displayName: profile.displayName.trim(),
       voiceprintThreshold: Math.min(0.95, Math.max(0.5, profile.voiceprintThreshold)),
     };
-    if (!normalized.speakerId || !normalized.displayName) {
-      setFeedback({ kind: 'error', message: '请填写用户标识和显示名称。' });
+    if (!normalized.displayName) {
+      setFeedback({ kind: 'error', message: '请填写个人称呼。' });
       return;
     }
 
@@ -126,8 +123,8 @@ const ProfileSettings: React.FC = () => {
   };
 
   const handleRegister = async () => {
-    if (!savedProfile.speakerId || !savedProfile.displayName) {
-      setFeedback({ kind: 'error', message: '请先在“个人资料”中保存用户标识和显示名称。' });
+    if (!savedProfile.displayName) {
+      setFeedback({ kind: 'error', message: '请先在“个人资料”中保存个人称呼。' });
       setActiveTab('profile');
       return;
     }
@@ -140,7 +137,6 @@ const ProfileSettings: React.FC = () => {
     try {
       const result = await registerVoiceprint(
         audioFile,
-        savedProfile.speakerId,
         savedProfile.displayName,
       );
       await refreshSpeakers();
@@ -165,7 +161,7 @@ const ProfileSettings: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await unregisterVoiceprint(currentSpeaker.speaker_id);
+      const result = await unregisterVoiceprint();
       await refreshSpeakers();
       setFeedback({ kind: 'success', message: result.message || '声纹已注销。' });
     } catch (error) {
@@ -200,7 +196,7 @@ const ProfileSettings: React.FC = () => {
             {savedProfile.displayName || '尚未配置用户'}
           </h3>
           <p className="theme-subtitle mt-2 text-sm">
-            {savedProfile.speakerId || '保存个人资料后生成用户身份'}
+            {savedProfile.displayName ? '个人专属语音身份' : '保存个人称呼后建立个人身份'}
           </p>
           <div className={`mt-5 rounded-full px-4 py-2 text-xs font-bold ${
             currentSpeaker ? 'theme-status-block-success' : 'theme-status-block-warning'
@@ -218,25 +214,24 @@ const ProfileSettings: React.FC = () => {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="theme-title mb-2 block text-sm font-bold">用户标识</span>
-              <input
-                className="theme-input w-full rounded-xl px-4 py-3 text-sm"
-                value={profile.speakerId}
-                onChange={(event) => updateProfile('speakerId', event.target.value)}
-                placeholder="例如：user-001"
-              />
-              <span className="theme-subtitle mt-2 block text-xs">同时作为语音识别使用的 speaker_id</span>
-            </label>
-            <label className="block">
-              <span className="theme-title mb-2 block text-sm font-bold">显示名称</span>
+              <span className="theme-title mb-2 block text-sm font-bold">个人称呼</span>
               <input
                 className="theme-input w-full rounded-xl px-4 py-3 text-sm"
                 value={profile.displayName}
                 onChange={(event) => updateProfile('displayName', event.target.value)}
-                placeholder="例如：Manager"
+                placeholder="例如：主人"
               />
-              <span className="theme-subtitle mt-2 block text-xs">用于页面展示和声纹记录名称</span>
+              <span className="theme-subtitle mt-2 block text-xs">用于页面展示和个人声纹记录</span>
             </label>
+            <div className="profile-panel-soft flex items-center gap-4 rounded-xl p-4">
+              <ShieldCheck className="theme-info-text h-6 w-6 shrink-0" />
+              <div>
+                <span className="theme-title block text-sm font-black">单人专属模式</span>
+                <span className="theme-subtitle mt-1 block text-xs leading-5">
+                  系统只维护并验证一份个人声纹，无需设置用户编号。
+                </span>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -326,14 +321,18 @@ const ProfileSettings: React.FC = () => {
                 {currentSpeaker ? '已注册' : '尚未注册'}
               </p>
               <p className="theme-subtitle mt-1 break-all text-sm">
-                {savedProfile.speakerId || '请先保存用户标识'}
+                {savedProfile.displayName || '请先保存个人称呼'}
               </p>
             </div>
           </div>
           <dl className="theme-divider mt-5 space-y-3 border-t pt-4 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="theme-subtitle">显示名称</dt>
+              <dt className="theme-subtitle">个人称呼</dt>
               <dd className="theme-title font-bold">{currentSpeaker?.name || savedProfile.displayName || '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="theme-subtitle">使用模式</dt>
+              <dd className="theme-title font-bold">单人专属</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="theme-subtitle">注册时间</dt>
@@ -408,9 +407,9 @@ const ProfileSettings: React.FC = () => {
         <button
           type="button"
           onClick={() => void handleRegister()}
-          disabled={isSubmitting || !audioFile || !savedProfile.speakerId}
+          disabled={isSubmitting || !audioFile || !savedProfile.displayName}
           className={`mt-4 flex items-center justify-center gap-2 rounded-xl px-5 py-4 text-sm font-black ${
-            isSubmitting || !audioFile || !savedProfile.speakerId ? 'theme-button-disabled' : 'theme-button-amber'
+            isSubmitting || !audioFile || !savedProfile.displayName ? 'theme-button-disabled' : 'theme-button-amber'
           }`}
         >
           {isSubmitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Fingerprint className="h-5 w-5" />}

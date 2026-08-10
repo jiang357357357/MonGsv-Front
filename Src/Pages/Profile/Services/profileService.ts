@@ -35,12 +35,10 @@ export const fetchRegisteredSpeakers = async (): Promise<RegisteredSpeaker[]> =>
 
 export const registerVoiceprint = async (
   audioFile: File,
-  speakerId: string,
   displayName: string,
 ): Promise<SpeakerMutationResponse> => {
   const formData = new FormData();
   formData.append('audio_file', audioFile);
-  formData.append('speaker_id', speakerId);
   formData.append('name', displayName);
 
   const response = await fetch(buildUrl('/asr/speaker/register/'), {
@@ -54,9 +52,8 @@ export const registerVoiceprint = async (
   return (await response.json()) as SpeakerMutationResponse;
 };
 
-export const unregisterVoiceprint = async (speakerId: string): Promise<SpeakerMutationResponse> => {
+export const unregisterVoiceprint = async (): Promise<SpeakerMutationResponse> => {
   const formData = new FormData();
-  formData.append('speaker_id', speakerId);
 
   const response = await fetch(buildUrl('/asr/speaker/unregister/'), {
     method: 'POST',
