@@ -3,13 +3,16 @@ import {
   AudioLines,
   CircleAlert,
   CircleCheck,
+  CircleX,
   Fingerprint,
   Gauge,
   Languages,
   LoaderCircle,
   RefreshCw,
   Save,
+  ScanFace,
   ShieldCheck,
+  ShieldQuestion,
   Trash2,
   Upload,
   UserRound,
@@ -19,6 +22,7 @@ import MainLayout from '../../Public/Components/Shared/MainLayout';
 import {
   fetchRegisteredSpeakers,
   registerVoiceprint,
+  testVoiceprint,
   unregisterVoiceprint,
 } from './Services/profileService';
 import {
@@ -26,6 +30,7 @@ import {
   PersonalProfile,
   ProfileTab,
   RegisteredSpeaker,
+  VoiceprintTestResult,
 } from './types';
 import './profile-settings.css';
 
@@ -60,11 +65,16 @@ const ProfileSettings: React.FC = () => {
   const [savedProfile, setSavedProfile] = useState<PersonalProfile>(readStoredProfile);
   const [speakers, setSpeakers] = useState<RegisteredSpeaker[]>([]);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [testAudioFile, setTestAudioFile] = useState<File | null>(null);
+  const [testResult, setTestResult] = useState<VoiceprintTestResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isTestDragging, setIsTestDragging] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const testFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentSpeaker = useMemo(
     () => speakers[0] || null,
@@ -112,14 +122,29 @@ const ProfileSettings: React.FC = () => {
     setFeedback({ kind: 'success', message: '个人配置已保存到当前浏览器。' });
   };
 
+  const isSupportedAudioFile = (file: File) => (
+    file.type.startsWith('audio/') || /\.(wav|mp3|m4a|flac|ogg|aac)$/i.test(file.name)
+  );
+
   const selectAudioFile = (file: File | null) => {
     if (!file) return;
-    if (!file.type.startsWith('audio/') && !/\.(wav|mp3|m4a|flac|ogg|aac)$/i.test(file.name)) {
+    if (!isSupportedAudioFile(file)) {
       setFeedback({ kind: 'error', message: '请选择有效的音频文件。' });
       return;
     }
     setAudioFile(file);
     setFeedback({ kind: 'info', message: `已选择 ${file.name}` });
+  };
+
+  const selectTestAudioFile = (file: File | null) => {
+    if (!file) return;
+    if (!isSupportedAudioFile(file)) {
+      setFeedback({ kind: 'error', message: '请选择有效的音频文件。' });
+      return;
+    }
+    setTestAudioFile(file);
+    setTestResult(null);
+    setFeedback({ kind: 'info', message: `已选择测试语音 ${file.name}` });
   };
 
   const handleRegister = async () => {
@@ -174,9 +199,42 @@ const ProfileSettings: React.FC = () => {
     }
   };
 
+  const handleVoiceprintTest = async () => {
+    if (!currentSpeaker) {
+      setFeedback({ kind: 'error', message: '请先注册个人声纹，再进行匹配测试。' });
+      setActiveTab('voiceprint');
+      return;
+    }
+    if (!testAudioFile) {
+      setFeedback({ kind: 'error', message: '请先选择一段用于测试的语音。' });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const response = await testVoiceprint(testAudioFile, savedProfile.voiceprintThreshold);
+      setTestResult(response.result);
+      setFeedback({
+        kind: response.result.is_known ? 'success' : 'error',
+        message: response.result.is_known
+          ? `声纹匹配通过：${response.result.name}`
+          : '声纹匹配未通过，该语音未达到当前阈值。',
+      });
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : '声纹测试失败。',
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile' as const, label: '个人资料', hint: '身份 + 偏好', icon: UserRound },
     { id: 'voiceprint' as const, label: '声纹配置', hint: '注册 + 状态', icon: Fingerprint },
+    { id: 'test' as const, label: '声纹测试', hint: '匹配 + 结果', icon: ScanFace },
   ];
 
   const feedbackClass = feedback?.kind === 'error'
@@ -419,6 +477,142 @@ const ProfileSettings: React.FC = () => {
     </div>
   );
 
+  const renderVoiceprintTest = () => {
+    const scorePercent = testResult
+      ? Math.max(0, Math.min(100, Math.round(testResult.similarity * 100)))
+      : 0;
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-[0.78fr_1.4fr]">
+        <section className="profile-panel flex min-h-[390px] flex-col rounded-2xl p-6">
+          <div className="flex items-center gap-2">
+            <ScanFace className="theme-info-text h-5 w-5" />
+            <h3 className="theme-title text-lg font-black">测试结果</h3>
+          </div>
+
+          <div className="profile-panel-soft mt-5 flex flex-1 flex-col rounded-2xl p-5">
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${
+                !testResult
+                  ? 'theme-status-block-info'
+                  : testResult.is_known
+                    ? 'theme-status-block-success'
+                    : 'theme-status-block-danger'
+              }`}>
+                {!testResult ? (
+                  <ShieldQuestion className="h-8 w-8" />
+                ) : testResult.is_known ? (
+                  <CircleCheck className="h-8 w-8" />
+                ) : (
+                  <CircleX className="h-8 w-8" />
+                )}
+              </div>
+              <h4 className="theme-title mt-5 text-xl font-black">
+                {!testResult ? '等待测试' : testResult.is_known ? '验证通过' : '验证未通过'}
+              </h4>
+              <p className="theme-subtitle mt-2 text-sm">
+                {!testResult
+                  ? '上传一段语音，与当前已注册声纹进行匹配。'
+                  : testResult.is_known
+                    ? `识别为 ${testResult.name}`
+                    : '未识别为当前注册用户'}
+              </p>
+              <strong className="theme-title mt-5 text-4xl font-black tabular-nums">
+                {testResult ? `${scorePercent}%` : '—'}
+              </strong>
+              <span className="theme-subtitle mt-1 text-xs">声纹相似度</span>
+            </div>
+
+            <div className="profile-test-meter mt-5 overflow-hidden rounded-full">
+              <div
+                className={`profile-test-meter-fill ${testResult?.is_known ? 'profile-test-meter-pass' : ''}`}
+                style={{ width: `${scorePercent}%` }}
+              />
+            </div>
+            <dl className="theme-divider mt-5 space-y-3 border-t pt-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="theme-subtitle">当前阈值</dt>
+                <dd className="theme-title font-bold">{savedProfile.voiceprintThreshold.toFixed(2)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="theme-subtitle">原始相似度</dt>
+                <dd className="theme-title font-bold">
+                  {testResult ? testResult.similarity.toFixed(4) : '—'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="theme-subtitle">测试对象</dt>
+                <dd className="theme-title text-right font-bold">
+                  {currentSpeaker?.name || savedProfile.displayName || '尚未注册'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <section className="profile-panel flex min-h-[390px] flex-col rounded-2xl p-6">
+          <div className="flex items-center gap-2">
+            <AudioLines className="theme-accent-text h-5 w-5" />
+            <h3 className="theme-title text-lg font-black">上传测试语音</h3>
+          </div>
+
+          <input
+            ref={testFileInputRef}
+            type="file"
+            accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg,.aac"
+            className="hidden"
+            onChange={(event) => selectTestAudioFile(event.target.files?.[0] || null)}
+          />
+          <button
+            type="button"
+            onClick={() => testFileInputRef.current?.click()}
+            onDragEnter={(event) => { event.preventDefault(); setIsTestDragging(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setIsTestDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setIsTestDragging(false);
+              selectTestAudioFile(event.dataTransfer.files?.[0] || null);
+            }}
+            className={`profile-upload-zone mt-5 flex flex-1 flex-col items-center justify-center rounded-2xl p-8 text-center transition-colors ${
+              isTestDragging ? 'profile-upload-zone-active' : ''
+            }`}
+          >
+            <div className="theme-nav-icon flex h-16 w-16 items-center justify-center rounded-2xl">
+              <Upload className="h-7 w-7" />
+            </div>
+            <h4 className="theme-title mt-5 max-w-full break-all text-xl font-black">
+              {testAudioFile ? testAudioFile.name : '选择或拖入测试语音'}
+            </h4>
+            <p className="theme-subtitle mt-2 max-w-md text-sm leading-6">
+              使用 5–15 秒清晰语音测试当前声纹。测试只读取匹配结果，不会更新或覆盖已注册声纹。
+            </p>
+            {testAudioFile ? (
+              <span className="theme-tag mt-4 rounded-full px-4 py-2 text-xs font-bold">
+                {(testAudioFile.size / 1024 / 1024).toFixed(2)} MB
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleVoiceprintTest()}
+            disabled={isTesting || !testAudioFile || !currentSpeaker}
+            className={`mt-4 flex items-center justify-center gap-2 rounded-xl px-5 py-4 text-sm font-black ${
+              isTesting || !testAudioFile || !currentSpeaker ? 'theme-button-disabled' : 'theme-button-amber'
+            }`}
+          >
+            {isTesting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ScanFace className="h-5 w-5" />}
+            {isTesting ? '正在匹配声纹…' : '开始声纹测试'}
+          </button>
+          {!currentSpeaker ? (
+            <p className="theme-subtitle mt-3 text-center text-xs">请先在“声纹配置”中完成注册。</p>
+          ) : null}
+        </section>
+      </div>
+    );
+  };
+
   return (
     <MainLayout
       currentView={AppView.PROFILE}
@@ -461,7 +655,11 @@ const ProfileSettings: React.FC = () => {
               {feedback.message}
             </div>
           ) : null}
-          {activeTab === 'profile' ? renderProfile() : renderVoiceprint()}
+          {activeTab === 'profile'
+            ? renderProfile()
+            : activeTab === 'voiceprint'
+              ? renderVoiceprint()
+              : renderVoiceprintTest()}
         </section>
       </div>
     </MainLayout>

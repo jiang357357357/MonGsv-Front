@@ -3,6 +3,7 @@ import {
   RegisteredSpeaker,
   SpeakerListResponse,
   SpeakerMutationResponse,
+  VoiceprintTestResponse,
 } from '../types';
 
 const buildUrl = (path: string): string => {
@@ -64,4 +65,23 @@ export const unregisterVoiceprint = async (): Promise<SpeakerMutationResponse> =
   }
 
   return (await response.json()) as SpeakerMutationResponse;
+};
+
+export const testVoiceprint = async (
+  audioFile: File,
+  threshold: number,
+): Promise<VoiceprintTestResponse> => {
+  const formData = new FormData();
+  formData.append('audio_file', audioFile);
+  formData.append('threshold', threshold.toString());
+
+  const response = await fetch(buildUrl('/asr/speaker/identify/'), {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response, `测试声纹失败（HTTP ${response.status}）`));
+  }
+
+  return (await response.json()) as VoiceprintTestResponse;
 };

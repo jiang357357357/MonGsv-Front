@@ -1,4 +1,4 @@
-export type ProfileTab = 'profile' | 'voiceprint';
+export type ProfileTab = 'profile' | 'voiceprint' | 'test';
 
 export interface PersonalProfile {
   displayName: string;
@@ -22,6 +22,18 @@ export interface SpeakerMutationResponse {
   success: boolean;
   message: string;
   speaker_id?: string;
+}
+
+export interface VoiceprintTestResult {
+  speaker_id: string | null;
+  name: string;
+  similarity: number;
+  is_known: boolean;
+}
+
+export interface VoiceprintTestResponse {
+  success: boolean;
+  result: VoiceprintTestResult;
 }
 
 export type Feedback = {

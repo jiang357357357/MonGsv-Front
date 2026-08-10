@@ -65,3 +65,20 @@
   background: #f8fbff;
   border-color: #7daae6;
 }
+
+.profile-workbench .profile-test-meter {
+  height: 10px;
+  background: #dfe7ef;
+  border: 1px solid #c7d3df;
+}
+
+.profile-workbench .profile-test-meter-fill {
+  height: 100%;
+  min-width: 0;
+  background: #d96a63;
+  transition: width 300ms ease;
+}
+
+.profile-workbench .profile-test-meter-pass {
+  background: #3ba777;
+}
