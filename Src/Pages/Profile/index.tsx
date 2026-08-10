@@ -7,9 +7,11 @@ import {
   Gauge,
   Languages,
   LoaderCircle,
+  Mic,
   RefreshCw,
   Save,
   ShieldCheck,
+  Square,
   Trash2,
   Upload,
   UserRound,
@@ -60,11 +62,22 @@ const ProfileSettings: React.FC = () => {
   const [savedProfile, setSavedProfile] = useState<PersonalProfile>(readStoredProfile);
   const [speakers, setSpeakers] = useState<RegisteredSpeaker[]>([]);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+
+  const recordingSupported = typeof window !== 'undefined'
+    && window.isSecureContext
+    && typeof MediaRecorder !== 'undefined'
+    && Boolean(navigator.mediaDevices?.getUserMedia);
 
   const currentSpeaker = useMemo(
     () => speakers[0] || null,
@@ -89,6 +102,27 @@ const ProfileSettings: React.FC = () => {
   useEffect(() => {
     void refreshSpeakers();
   }, [refreshSpeakers]);
+
+  useEffect(() => {
+    if (!audioFile) {
+      setAudioPreviewUrl('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(audioFile);
+    setAudioPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audioFile]);
+
+  useEffect(() => () => {
+    if (recordingTimerRef.current !== null) window.clearInterval(recordingTimerRef.current);
+    const recorder = mediaRecorderRef.current;
+    if (recorder) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const updateProfile = <K extends keyof PersonalProfile>(key: K, value: PersonalProfile[K]) => {
     setProfile((current) => ({ ...current, [key]: value }));
@@ -120,6 +154,76 @@ const ProfileSettings: React.FC = () => {
     }
     setAudioFile(file);
     setFeedback({ kind: 'info', message: `已选择 ${file.name}` });
+  };
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === 'recording') recorder.stop();
+  };
+
+  const startRecording = async () => {
+    if (!recordingSupported) {
+      setFeedback({ kind: 'error', message: '当前页面不是安全的 HTTPS 环境，浏览器无法使用麦克风。' });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
+      mediaStreamRef.current = stream;
+
+      const mimeCandidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ];
+      const mimeType = mimeCandidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        const resolvedType = recorder.mimeType || mimeType || 'audio/webm';
+        const extension = resolvedType.includes('ogg') ? 'ogg' : 'webm';
+        const blob = new Blob(chunks, { type: resolvedType });
+        if (blob.size > 0) {
+          selectAudioFile(new File([blob], `personal-voiceprint-${Date.now()}.${extension}`, { type: resolvedType }));
+        }
+        stream.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        if (recordingTimerRef.current !== null) {
+          window.clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
+      };
+
+      setAudioFile(null);
+      setRecordingSeconds(0);
+      setFeedback({ kind: 'info', message: '正在录音，请自然说话 5–15 秒。' });
+      recorder.start(250);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingSeconds((seconds) => seconds + 1);
+      }, 1000);
+    } catch (error) {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      const message = error instanceof DOMException && error.name === 'NotAllowedError'
+        ? '麦克风权限被拒绝，请在浏览器地址栏中允许麦克风后重试。'
+        : error instanceof Error ? error.message : '无法启动浏览器录音。';
+      setFeedback({ kind: 'error', message });
+    }
   };
 
   const handleRegister = async () => {
@@ -373,9 +477,7 @@ const ProfileSettings: React.FC = () => {
           className="hidden"
           onChange={(event) => selectAudioFile(event.target.files?.[0] || null)}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
+        <div
           onDragEnter={(event) => { event.preventDefault(); setIsDragging(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={() => setIsDragging(false)}
@@ -389,20 +491,67 @@ const ProfileSettings: React.FC = () => {
           }`}
         >
           <div className="theme-nav-icon flex h-16 w-16 items-center justify-center rounded-2xl">
-            <Upload className="h-7 w-7" />
+            {isRecording ? <Mic className="h-7 w-7 animate-pulse text-red-500" /> : <Upload className="h-7 w-7" />}
           </div>
           <h4 className="theme-title mt-5 text-xl font-black">
-            {audioFile ? audioFile.name : '选择或拖入个人语音'}
+            {isRecording
+              ? `正在录音 ${String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:${String(recordingSeconds % 60).padStart(2, '0')}`
+              : audioFile ? audioFile.name : '录制或选择个人语音'}
           </h4>
           <p className="theme-subtitle mt-2 max-w-md text-sm leading-6">
             建议使用安静环境下 5–15 秒、仅包含本人声音的清晰音频。重新注册会更新现有声纹。
           </p>
-          {audioFile ? (
-            <span className="theme-tag mt-4 rounded-full px-4 py-2 text-xs font-bold">
-              {(audioFile.size / 1024 / 1024).toFixed(2)} MB
-            </span>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            {isRecording ? (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="theme-button-primary flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black"
+              >
+                <Square className="h-4 w-4 fill-current" />
+                停止录音
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void startRecording()}
+                disabled={!recordingSupported}
+                className={`flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black ${
+                  recordingSupported ? 'theme-button-amber' : 'theme-button-disabled'
+                }`}
+              >
+                <Mic className="h-4 w-4" />
+                浏览器录音
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRecording}
+              className={`flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black ${
+                isRecording ? 'theme-button-disabled' : 'theme-button-secondary'
+              }`}
+            >
+              <Upload className="h-4 w-4" />
+              选择音频文件
+            </button>
+          </div>
+          {!recordingSupported ? (
+            <p className="theme-status-block-warning mt-4 rounded-xl px-4 py-2 text-xs font-bold">
+              浏览器录音需要通过 HTTPS 访问；当前仍可选择本地音频文件。
+            </p>
           ) : null}
-        </button>
+          {audioFile ? (
+            <div className="mt-4 w-full max-w-xl">
+              <div className="mb-2 flex items-center justify-center gap-2">
+                <span className="theme-tag rounded-full px-4 py-2 text-xs font-bold">
+                  {(audioFile.size / 1024 / 1024).toFixed(2)} MB
+                </span>
+              </div>
+              {audioPreviewUrl ? <audio className="w-full" controls src={audioPreviewUrl} /> : null}
+            </div>
+          ) : null}
+        </div>
 
         <button
           type="button"

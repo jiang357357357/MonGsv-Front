@@ -35,6 +35,13 @@ const normalizePath = (p?: string): string => {
 };
 
 export const getApiBaseUrl = (): string => {
+  // The public HTTPS proxy serves the frontend and gateway on one origin.
+  // Keeping API calls same-origin avoids mixed-content failures and lets WSS
+  // follow the page's trusted TLS connection automatically.
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return window.location.origin;
+  }
+
   const config = getApiConfig();
   const path = normalizePath(config.basePath);
   return `http://${config.baseUrl}:${config.port}${path}`;
