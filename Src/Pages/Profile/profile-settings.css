@@ -1,0 +1,67 @@
+.profile-workbench {
+  color: #1f2d3d;
+}
+
+.profile-workbench .profile-page-surface {
+  background: linear-gradient(180deg, #d6e2ee 0%, #d3deea 100%);
+  border-color: #afc0d1;
+  box-shadow: none;
+}
+
+.profile-workbench .profile-tab {
+  background: #e3ebf4;
+  border-color: #bdcbda;
+}
+
+.profile-workbench .profile-tab:hover {
+  background: #edf4fb;
+}
+
+.profile-workbench .profile-tab-active {
+  background: #ffffff;
+  border-color: #8eb1df;
+  box-shadow: none;
+}
+
+.profile-workbench .profile-tab-active .theme-title,
+.profile-workbench .profile-tab-active .theme-subtitle {
+  color: #1f4f8a;
+}
+
+.profile-workbench .profile-tab-active .theme-nav-icon {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(125, 170, 230, 0.45);
+  color: #1f4f8a;
+}
+
+.profile-workbench .profile-panel {
+  background: #ffffff;
+  border: 1px solid #c4d3e1;
+  box-shadow: none;
+}
+
+.profile-workbench .profile-panel-soft {
+  background: rgba(245, 249, 253, 0.8);
+  border: 1px solid #cbd8e4;
+}
+
+.profile-workbench .theme-input {
+  background: #fcfeff;
+  border-color: #c9d4e0;
+  color: #1f2d3d;
+}
+
+.profile-workbench .theme-input:focus {
+  border-color: #7daae6;
+}
+
+.profile-workbench .profile-upload-zone {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px dashed #b8c8d8;
+}
+
+.profile-workbench .profile-upload-zone:hover,
+.profile-workbench .profile-upload-zone-active {
+  background: #f8fbff;
+  border-color: #7daae6;
+}
