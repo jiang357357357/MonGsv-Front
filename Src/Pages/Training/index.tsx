@@ -251,9 +251,9 @@ const TrainingDashboard: React.FC = () => {
     trainGpt: true,
     trainingOrder: 'sovits_first',
     sovitsBatchSize: 4,
-    sovitsEpoch: 50,
+    sovitsEpoch: 8,
     gptBatchSize: 4,
-    gptEpoch: 20,
+    gptEpoch: 15,
     gpuNumbers: '0',
   });
 
