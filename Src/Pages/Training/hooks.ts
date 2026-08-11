@@ -76,7 +76,11 @@ const buildDerivedTrainingPaths = (
   };
 };
 
-export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[] = []) => {
+export const useTrainingSimulation = (
+  params?: TrainingParams,
+  audioFiles: File[] = [],
+  roleValidationError: string | null = null,
+) => {
   const [isTraining, setIsTraining] = useState(false);
   const [phaseStatuses, setPhaseStatuses] = useState<TrainingPhaseStatuses>(createInitialPhaseStatuses);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +298,10 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       setError('角色名不能为空');
       return;
     }
+    if (roleValidationError) {
+      setError(roleValidationError);
+      return;
+    }
     if (!params.version.trim()) {
       setError('模型版本不能为空');
       return;
@@ -362,7 +370,7 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       setIsTraining(false);
       logger.error('启动训练失败', { error: err });
     }
-  }, [applyTrainingWorkflowStatus, applyWorkflowSteps, audioFiles, params, pollTrainingWorkflow]);
+  }, [applyTrainingWorkflowStatus, applyWorkflowSteps, audioFiles, params, pollTrainingWorkflow, roleValidationError]);
 
   const startSingleTraining = useCallback(async (target: 'gpt' | 'sovits') => {
     if (!params) {
@@ -377,6 +385,10 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
     }
     if (!roleName) {
       setError('角色名不能为空');
+      return;
+    }
+    if (roleValidationError) {
+      setError(roleValidationError);
       return;
     }
     if (!params.outputDir.trim()) {
@@ -438,7 +450,7 @@ export const useTrainingSimulation = (params?: TrainingParams, audioFiles: File[
       setIsTraining(false);
       logger.error('单独训练启动失败', { error: err, target });
     }
-  }, [params, pollTrainingStatuses]);
+  }, [params, pollTrainingStatuses, roleValidationError]);
 
   const handleStopTraining = useCallback(async () => {
     try {

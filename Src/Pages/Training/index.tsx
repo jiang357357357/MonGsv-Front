@@ -96,6 +96,9 @@ const buildListFilePath = (workspace: RoleWorkspaceInfo | null, currentValue: st
 const normalizePathSegment = (value: string): string =>
   value.trim().replace(/[\\/:*?"<>|]+/g, '_');
 
+const normalizeRoleIdentity = (value: string): string =>
+  value.trim().normalize('NFKC').toLocaleLowerCase();
+
 const AUDIO_FILE_EXTENSIONS = new Set(['wav', 'mp3', 'flac', 'm4a', 'ogg', 'aac', 'wma', 'opus']);
 
 const isAudioFile = (file: File): boolean => {
@@ -275,6 +278,32 @@ const TrainingDashboard: React.FC = () => {
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const audioDirectoryInputRef = useRef<HTMLInputElement | null>(null);
 
+  const duplicateRoleName = useMemo(() => {
+    const candidate = normalizeRoleIdentity(params.characterName || '');
+    const worldName = normalizeRoleIdentity(params.worldName || '');
+    if (!candidate || !worldName) {
+      return null;
+    }
+
+    const existingRole = roles.find((role) => normalizeRoleIdentity(role.name) === candidate);
+    if (existingRole) {
+      return existingRole.name;
+    }
+
+    const existingWorkspace = roleWorkspaces.find((workspace) => {
+      if (normalizeRoleIdentity(workspace.role_name) !== candidate) {
+        return false;
+      }
+      const workspaceWorld = normalizeRoleIdentity(workspace.world_name || '');
+      return !workspaceWorld || workspaceWorld === worldName;
+    });
+    return existingWorkspace?.role_name || null;
+  }, [params.characterName, params.worldName, roleWorkspaces, roles]);
+
+  const duplicateRoleMessage = duplicateRoleName
+    ? `角色“${duplicateRoleName}”已存在，请使用其他角色名称。`
+    : null;
+
   const {
     isTraining,
     phaseStatuses,
@@ -283,7 +312,7 @@ const TrainingDashboard: React.FC = () => {
     currentMessage,
     toggleTraining,
     getSubStepStatus,
-  } = useTrainingSimulation(params, selectedAudioFiles);
+  } = useTrainingSimulation(params, selectedAudioFiles, duplicateRoleMessage);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -451,9 +480,15 @@ const TrainingDashboard: React.FC = () => {
     ? hasExistingDatasetSource
     : hasExistingRawAudio || hasPendingAudioFiles;
   const canStartTraining = Boolean(
-    params.worldName?.trim() && roleName && params.version.trim() && hasTrainingAudioSource
+    params.worldName?.trim()
+      && roleName
+      && params.version.trim()
+      && hasTrainingAudioSource
+      && !isLoadingRoles
+      && !roleError
+      && !duplicateRoleMessage
   );
-  const startDisabledReason = !params.worldName?.trim()
+  const baseStartDisabledReason = !params.worldName?.trim()
     ? '请先选择世界'
     : !roleName
       ? '请先选择或填写角色'
@@ -467,8 +502,14 @@ const TrainingDashboard: React.FC = () => {
         ? '请先选择训练音频'
         : '开始训练任务';
 
+  const startDisabledReason = isLoadingRoles
+    ? '正在检查角色名称'
+    : roleError
+      ? '角色列表加载失败，暂时无法校验角色名称'
+      : duplicateRoleMessage || baseStartDisabledReason;
+
   const completedCount = completedPhases.length;
-  const nextAction = !params.worldName?.trim()
+  const baseNextAction = !params.worldName?.trim()
     ? '先选择世界'
     : !roleName
       ? '选择角色'
@@ -483,6 +524,14 @@ const TrainingDashboard: React.FC = () => {
               : !isTraining
               ? '可以启动完整训练'
               : '等待当前阶段完成';
+
+  const nextAction = isLoadingRoles
+    ? '正在检查角色名称'
+    : roleError
+      ? '重新加载角色列表'
+      : duplicateRoleMessage
+        ? '更换角色名称'
+        : baseNextAction;
 
   const handleAudioSelected = (files: FileList | null) => {
     if (!files || files.length === 0) {
@@ -651,23 +700,26 @@ const TrainingDashboard: React.FC = () => {
                 onKeyDown={handleRoleKeyDown}
                 disabled={isTraining || !params.worldName}
                 aria-label="角色"
-                list="role-options"
+                aria-invalid={Boolean(duplicateRoleMessage)}
+                aria-describedby={duplicateRoleMessage ? 'role-name-error' : undefined}
                 placeholder={
                   !params.worldName
                     ? '请先选择世界'
                     : '输入角色名'
                 }
-                className="theme-input w-full rounded-xl bg-[rgba(255,255,255,0.94)] px-5 py-4 text-right text-xl font-black transition-all disabled:opacity-50"
+                className={`theme-input w-full rounded-xl bg-[rgba(255,255,255,0.94)] px-5 py-4 text-right text-xl font-black transition-all disabled:opacity-50 ${
+                  duplicateRoleMessage ? 'border-red-400 focus:border-red-500' : ''
+                }`}
               />
-              <datalist id="role-options">
-                {roles.map((role) => (
-                  <option key={role.id} value={role.name} />
-                ))}
-              </datalist>
               {isLoadingRoles ? (
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                   <Loader2 className="theme-kicker h-4 w-4 animate-spin" />
                 </div>
+              ) : null}
+              {duplicateRoleMessage ? (
+                <p id="role-name-error" className="mt-2 text-right text-xs font-bold text-red-600">
+                  {duplicateRoleMessage}
+                </p>
               ) : null}
             </div>
           </div>

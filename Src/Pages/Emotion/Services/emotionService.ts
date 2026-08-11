@@ -82,10 +82,27 @@ interface TranscribeApiPayload {
   segments?: Array<{ text?: string; language?: string }>;
 }
 
+const formatErrorValue = (value: unknown): string | null => {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (value && typeof value === 'object') {
+    const detail = value as Record<string, unknown>;
+    const message = typeof detail.message === 'string' ? detail.message.trim() : '';
+    const code = typeof detail.code === 'string' ? detail.code.trim() : '';
+    if (message) {
+      return code ? `${message}（${code}）` : message;
+    }
+  }
+
+  return null;
+};
+
 const readError = async (response: Response, fallback: string): Promise<string> => {
   try {
     const data = await response.json();
-    return data?.detail || data?.message || fallback;
+    return formatErrorValue(data?.detail) || formatErrorValue(data?.message) || fallback;
   } catch {
     return `HTTP ${response.status}: ${response.statusText}`;
   }
