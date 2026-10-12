@@ -46,6 +46,7 @@ export interface TTSRequestParams {
   temperature?: number;
   speed?: number;
   sample_steps?: number;
+  cfg_rate?: number;
   if_sr?: boolean;
   how_to_cut?: string;
   ref_free?: boolean;
@@ -68,6 +69,7 @@ export interface RoleEmotionSynthesisParams {
   top_p?: number;
   temperature?: number;
   sample_steps?: number;
+  cfg_rate?: number;
   if_sr?: boolean;
   ref_free?: boolean;
   if_freeze?: boolean;

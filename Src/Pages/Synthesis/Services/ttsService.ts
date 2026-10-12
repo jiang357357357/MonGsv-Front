@@ -81,6 +81,7 @@ export const synthesizeSpeech = async (params: TTSRequestParams): Promise<AudioB
   if (params.temperature !== undefined) formData.append('temperature', params.temperature.toString());
   if (params.speed !== undefined) formData.append('speed', params.speed.toString());
   if (params.sample_steps !== undefined) formData.append('sample_steps', params.sample_steps.toString());
+  if (params.cfg_rate !== undefined) formData.append('cfg_rate', params.cfg_rate.toString());
   if (params.if_sr !== undefined) formData.append('if_sr', String(params.if_sr));
   if (params.how_to_cut !== undefined) formData.append('how_to_cut', params.how_to_cut);
   if (params.ref_free !== undefined) formData.append('ref_free', String(params.ref_free));
