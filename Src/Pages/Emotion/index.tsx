@@ -28,6 +28,7 @@ const EmotionConfigView: React.FC = () => {
   const [characters, setCharacters] = useState<RoleInfo[]>([]);
   const [emotions, setEmotions] = useState<EmotionInfo[]>([]);
   const [roleWorkspaces, setRoleWorkspaces] = useState<RoleWorkspaceInfo[]>([]);
+  const [selectedWorkspaceDetails, setSelectedWorkspaceDetails] = useState<RoleWorkspaceInfo | null>(null);
   
   // Loading states
   const [isLoadingWorlds, setIsLoadingWorlds] = useState(false);
@@ -62,7 +63,7 @@ const EmotionConfigView: React.FC = () => {
     (role) => role.name === selectedCharacterName && role.version === selectedVersionId,
   ) || null;
   const selectedWorld = worlds.find(w => w.id === selectedWorldId) || null;
-  const selectedWorkspace = useMemo(() => {
+  const selectedWorkspaceSummary = useMemo(() => {
     if (!selectedCharacterName || !selectedVersionId) {
       return null;
     }
@@ -76,6 +77,12 @@ const EmotionConfigView: React.FC = () => {
       (workspace.world_name || '') === (selectedWorld?.name || ''),
     ) || matchingWorkspaces[0] || null;
   }, [roleWorkspaces, selectedCharacterName, selectedVersionId, selectedWorld?.name]);
+  const selectedWorkspace = selectedWorkspaceDetails &&
+    selectedWorkspaceDetails.role_name === selectedCharacterName &&
+    (selectedWorkspaceDetails.base_version || '') === selectedVersionId &&
+    (!selectedWorld?.name || (selectedWorkspaceDetails.world_name || '') === selectedWorld.name)
+      ? selectedWorkspaceDetails
+      : selectedWorkspaceSummary;
   const selectedSlicedAudioFiles = selectedWorkspace?.model_sliced_files?.length
     ? selectedWorkspace.model_sliced_files
     : selectedWorkspace?.sliced_files || [];
@@ -121,7 +128,7 @@ const EmotionConfigView: React.FC = () => {
   useEffect(() => {
     const loadWorkspaces = async () => {
       try {
-        const workspaces = await getRoleWorkspaces();
+        const workspaces = await getRoleWorkspaces({ includeFiles: false });
         setRoleWorkspaces(workspaces);
       } catch (err) {
         logger.warn('加载角色工作区失败', {
@@ -132,6 +139,43 @@ const EmotionConfigView: React.FC = () => {
 
     loadWorkspaces();
   }, []);
+
+  // Only load the current workspace's potentially large file lists when the
+  // add-emotion dialog actually needs them.
+  useEffect(() => {
+    if (!isAddModalOpen || !selectedCharacterName || !selectedVersionId) {
+      setSelectedWorkspaceDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSelectedWorkspaceDetails(null);
+
+    const loadWorkspaceDetails = async () => {
+      try {
+        const workspaces = await getRoleWorkspaces({
+          roleName: selectedCharacterName,
+          worldName: selectedWorld?.name || undefined,
+          baseVersion: selectedVersionId,
+          includeFiles: true,
+        });
+        if (!cancelled) {
+          setSelectedWorkspaceDetails(workspaces[0] || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          logger.warn('加载当前角色音频列表失败', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    };
+
+    loadWorkspaceDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAddModalOpen, selectedCharacterName, selectedVersionId, selectedWorld?.name]);
 
   // Load worlds on mount
   useEffect(() => {

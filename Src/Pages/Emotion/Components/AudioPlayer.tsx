@@ -29,6 +29,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const onEndedRef = useRef(onEnded);
+  const onErrorRef = useRef(onError);
+
+  onEndedRef.current = onEnded;
+  onErrorRef.current = onError;
 
   // 初始化音频元素
   useEffect(() => {
@@ -49,7 +54,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     audioRef.current = audio;
     
     // 设置属性
-    audio.preload = 'auto';
+    audio.preload = 'metadata';
     audio.volume = isMuted ? 0 : volume;
 
     // 事件监听
@@ -78,7 +83,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       } else {
         setCurrentTime(0);
       }
-      if (onEnded) onEnded();
+      onEndedRef.current?.();
     };
 
     const handleError = (e: Event) => {
@@ -95,9 +100,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         src: audio.src,
       });
       
-      if (onError) {
-        onError(new Error(errorMessage));
-      }
+      onErrorRef.current?.(new Error(errorMessage));
     };
 
     const handleCanPlay = () => {
@@ -164,7 +167,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.pause();
       audio.src = '';
     };
-  }, [src, onEnded, onError, isMuted, volume]);
+  }, [src]);
 
   // 更新音量
   useEffect(() => {

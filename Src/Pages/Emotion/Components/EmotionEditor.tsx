@@ -263,13 +263,6 @@ const EmotionEditor: React.FC<EmotionEditorProps> = ({
                       const audioUrl = getAudioFileUrl(audioFile);
                       const fileName = audioFile.split('/').pop() || audioFile;
                       
-                      logger.debug('🎵 渲染音频文件', {
-                        '索引': index,
-                        '原始路径': audioFile,
-                        '构建的URL': audioUrl,
-                        '显示文件名': fileName,
-                      });
-                      
                       return (
                         <div key={index} className="space-y-2">
                           <div className="theme-section-soft flex items-center justify-between p-2 rounded-lg group">
@@ -391,4 +384,3 @@ const EmotionEditor: React.FC<EmotionEditorProps> = ({
 };
 
 export default EmotionEditor;
-

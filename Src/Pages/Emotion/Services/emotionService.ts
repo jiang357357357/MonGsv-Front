@@ -50,6 +50,13 @@ export interface RoleWorkspaceInfo {
   sliced_files?: string[];
 }
 
+export interface RoleWorkspaceQuery {
+  roleName?: string;
+  worldName?: string;
+  baseVersion?: string;
+  includeFiles?: boolean;
+}
+
 export interface SaveRoleEmotionParams {
   roleId: number;
   emotionName: string;
@@ -247,9 +254,19 @@ export const getTranscribeConfigForLanguage = (language?: string): Pick<
   };
 };
 
-export const getRoleWorkspaces = async (): Promise<RoleWorkspaceInfo[]> => {
+export const getRoleWorkspaces = async (
+  query: RoleWorkspaceQuery = {},
+): Promise<RoleWorkspaceInfo[]> => {
   const baseUrl = getApiBaseUrl();
-  const apiUrl = `${baseUrl}/api/role/workspace/list/`;
+  const params = new URLSearchParams();
+  if (query.roleName) params.set('role_name', query.roleName);
+  if (query.worldName) params.set('world_name', query.worldName);
+  if (query.baseVersion) params.set('base_version', query.baseVersion);
+  if (query.includeFiles !== undefined) {
+    params.set('include_files', String(query.includeFiles));
+  }
+  const suffix = params.size > 0 ? `?${params.toString()}` : '';
+  const apiUrl = `${baseUrl}/api/role/workspace/list/${suffix}`;
   const response = await fetch(apiUrl);
 
   if (!response.ok) {

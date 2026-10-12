@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Smile, Mic, Music, Plus, X, AlertCircle, Loader2, Waves, Globe } from 'lucide-react';
 import AudioPlayer from './AudioPlayer';
@@ -56,11 +56,17 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const languageOptions = availableLanguages.map(lang => ({ id: lang, name: formatReferenceLanguageName(lang) }));
-  const slicedAudioOptions = slicedAudioFiles.map((path) => ({
-    id: path,
-    name: path.split(/[\\/]/).pop() || path,
-  }));
+  const languageOptions = useMemo(
+    () => availableLanguages.map(lang => ({ id: lang, name: formatReferenceLanguageName(lang) })),
+    [availableLanguages],
+  );
+  const slicedAudioOptions = useMemo(
+    () => slicedAudioFiles.map((path) => ({
+      id: path,
+      name: path.split(/[\\/]/).pop() || path,
+    })),
+    [slicedAudioFiles],
+  );
   const previewAudioUrl = audioFileUrl || (selectedSlicedAudioPath ? getAudioFileUrl(selectedSlicedAudioPath) : null);
   const previewAudioName = audioFile?.name || (selectedSlicedAudioPath ? selectedSlicedAudioPath.split(/[\\/]/).pop() || selectedSlicedAudioPath : undefined);
   const hasSelectedAudio = Boolean(audioFile || selectedSlicedAudioPath);
@@ -503,4 +509,3 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
 };
 
 export default AddEmotionModal;
-
