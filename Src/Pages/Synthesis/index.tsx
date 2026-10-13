@@ -14,6 +14,7 @@ import { AppView } from '../../types';
 import SynthesisConfig from './Components/SynthesisConfig';
 import SynthesisInput from './Components/SynthesisInput';
 import SynthesisStatus from './Components/SynthesisStatus';
+import SynthesisAdvanced, { samplingDefaults, SynthesisAdvancedSettings } from './Components/SynthesisAdvanced';
 import { audioBufferToWavBlob } from './audioUtils';
 
 const SynthesisView: React.FC = () => {
@@ -38,97 +39,64 @@ const SynthesisView: React.FC = () => {
   const [selectedCutMethod, setSelectedCutMethod] = useState('按标点符号切');
   const [selectedInferenceMode, setSelectedInferenceMode] = useState('normal');
   const [speedFactor, setSpeedFactor] = useState(1.0);
+  const [advanced, setAdvanced] = useState<SynthesisAdvancedSettings>({
+    useModelDefaults: true, ...samplingDefaults(''), seed: -1,
+    topK: 15, topP: 1, temperature: 1, pauseSecond: 0.3,
+  });
+  const [result, setResult] = useState<{ character: string; emotion: string; version: string; speed: number; seed: number } | null>(null);
   
   const [text, setText] = useState('你好，这是一段测试文本');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelStatus, setModelStatus] = useState('等待模型');
 
-  const worldsRequestRef = useRef(0);
   const charactersRequestRef = useRef(0);
   const emotionsRequestRef = useRef(0);
 
   const { isPlaying, audioBuffer, setAudioBuffer, playAudio, stopAudio } = useAudioPlayer();
   const selectedRole = characters.find((character) => character.name === selectedCharacterName) || null;
 
-  // Load versions on mount
+  // Start with an available model and its world, preferring Turbo when installed.
   useEffect(() => {
-    const loadVersions = async () => {
+    let cancelled = false;
+    const loadCatalog = async () => {
       setIsLoadingVersions(true);
-      setError(null);
-      try {
-        const versionList = await getVersions();
-        const versionInfos: VersionInfo[] = versionList.map(v => ({
-          id: v,
-          name: v,
-        }));
-        setVersions(versionInfos);
-        
-        // Auto-select first version
-        if (versionInfos.length > 0) {
-          setSelectedVersionId(versionInfos[0].id);
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '加载版本列表失败';
-        setError(errorMessage);
-        console.error('加载版本列表失败:', err);
-      } finally {
-        setIsLoadingVersions(false);
-      }
-    };
-    
-    loadVersions();
-  }, []);
-
-  // Load worlds once; the list itself is not version-specific.
-  useEffect(() => {
-    const loadWorlds = async () => {
-      const requestId = ++worldsRequestRef.current;
       setIsLoadingWorlds(true);
-      setError(null);
       try {
-        const worldList = await fetchWorlds();
-        if (requestId !== worldsRequestRef.current) {
-          return;
-        }
+        const [versionList, worldList, roleList] = await Promise.all([
+          getVersions(), fetchWorlds(), getCharacters(),
+        ]);
+        if (cancelled) return;
+        setVersions(versionList.map(version => ({ id: version, name: version })));
         setWorlds(worldList);
-
-        setSelectedWorldId((prev) => {
-          if (worldList.length === 0) {
-            return '';
-          }
-          const stillExists = worldList.some((world) => world.id === prev);
-          return stillExists ? prev : worldList[0].id;
-        });
-
-        if (worldList.length === 0) {
-          setSelectedWorldId('');
-          setCharacters([]);
-          setSelectedCharacterName('');
-          setEmotions([]);
-          setSelectedEmotion('');
-        }
+        const readyRoles = roleList.filter(role => role.gpt_model_path && role.sov_model_path
+          && versionList.includes(role.version || '') && worldList.some(world => world.id === role.world_id));
+        const preferred = readyRoles.find(role => role.version === 'v5turbo') || readyRoles[0];
+        setSelectedVersionId(preferred?.version || versionList[0] || '');
+        setSelectedWorldId(preferred?.world_id ?? worldList[0]?.id ?? '');
+        setSelectedCharacterName(preferred?.name || '');
       } catch (err) {
-        if (requestId !== worldsRequestRef.current) {
-          return;
-        }
-        const errorMessage = err instanceof Error ? err.message : '加载世界列表失败';
-        setError(errorMessage);
-        console.error('加载世界列表失败:', err);
-        setWorlds([]);
+        if (!cancelled) setError(err instanceof Error ? err.message : '加载模型列表失败');
       } finally {
-        if (requestId === worldsRequestRef.current) {
+        if (!cancelled) {
+          setIsLoadingVersions(false);
           setIsLoadingWorlds(false);
         }
       }
     };
-
-    void loadWorlds();
+    void loadCatalog();
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    setAdvanced(previous => ({ ...previous, ...samplingDefaults(selectedVersionId) }));
+  }, [selectedVersionId]);
 
   // Load characters when world or version changes
   useEffect(() => {
+    const requestId = ++charactersRequestRef.current;
     if (!selectedVersionId || selectedWorldId === '') {
+      setIsLoadingCharacters(false);
       setCharacters([]);
       setSelectedCharacterName('');
       setEmotions([]);
@@ -137,7 +105,6 @@ const SynthesisView: React.FC = () => {
     }
 
     const loadCharacters = async () => {
-      const requestId = ++charactersRequestRef.current;
       setIsLoadingCharacters(true);
       setError(null);
       try {
@@ -175,18 +142,20 @@ const SynthesisView: React.FC = () => {
     };
 
     void loadCharacters();
+    return () => { ++charactersRequestRef.current; };
   }, [selectedVersionId, selectedWorldId]);
 
   // Load emotions when character changes
   useEffect(() => {
+    const requestId = ++emotionsRequestRef.current;
     if (!selectedVersionId || !selectedCharacterName || !selectedRole) {
+      setIsLoadingEmotions(false);
       setEmotions([]);
       setSelectedEmotion('');
       return;
     }
 
     const loadEmotions = async () => {
-      const requestId = ++emotionsRequestRef.current;
       setIsLoadingEmotions(true);
       setError(null);
       try {
@@ -218,6 +187,7 @@ const SynthesisView: React.FC = () => {
     };
 
     void loadEmotions();
+    return () => { ++emotionsRequestRef.current; };
   }, [selectedVersionId, selectedCharacterName, selectedRole?.id]);
 
   useEffect(() => {
@@ -228,7 +198,12 @@ const SynthesisView: React.FC = () => {
     setModelStatus('待加载');
   }, [selectedRole]);
 
+  const isReady = Boolean(selectedRole && selectedEmotion && !isLoadingCharacters && !isLoadingEmotions
+    && selectedRole.version === selectedVersionId && selectedRole.world_id === selectedWorldId
+    && emotions.some(emotion => emotion.name === selectedEmotion));
+
   const handleGenerate = async () => {
+    if (isProcessing || !isReady) return;
     if (!text.trim()) {
       setError('请输入要合成的文本');
       return;
@@ -254,9 +229,26 @@ const SynthesisView: React.FC = () => {
       return;
     }
 
+    const supportsSteps = ['v3', 'v4', 'v5dev', 'v5turbo'].includes(selectedVersionId);
+    const isV5 = selectedVersionId === 'v5dev' || selectedVersionId === 'v5turbo';
+    if (!Number.isInteger(advanced.seed) || advanced.seed < -1 || advanced.seed > 4294967295) {
+      setError('随机种子必须是 -1 或 0 至 4294967295 的整数');
+      return;
+    }
+    if ((supportsSteps && !advanced.useModelDefaults
+      && (!Number.isInteger(advanced.sampleSteps) || advanced.sampleSteps < 1 || advanced.sampleSteps > 128))
+      || (isV5 && !advanced.useModelDefaults && (advanced.cfgRate < 0 || advanced.cfgRate > 10))
+      || !Number.isInteger(advanced.topK) || advanced.topK < 1 || advanced.topK > 100
+      || advanced.topP <= 0 || advanced.topP > 1 || advanced.temperature <= 0 || advanced.temperature > 2
+      || advanced.pauseSecond < 0 || advanced.pauseSecond > 5) {
+      setError('请检查高级参数：步数 1–128，CFG 0–10，Top K 1–100，Top P 0–1（不含 0），温度 0–2（不含 0），停顿 0–5 秒');
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
     setAudioBuffer(null);
+    setResult(null);
     stopAudio();
 
     try {
@@ -272,11 +264,21 @@ const SynthesisView: React.FC = () => {
         speed: speedFactor,
         how_to_cut: selectedCutMethod,
         inference_mode: selectedInferenceMode,
+        seed: advanced.seed,
+        top_k: advanced.topK,
+        top_p: advanced.topP,
+        temperature: advanced.temperature,
+        pause_second: advanced.pauseSecond,
+        // Omit these values to preserve the installed model's defaults.
+        ...(supportsSteps && !advanced.useModelDefaults ? { sample_steps: advanced.sampleSteps } : {}),
+        ...(isV5 && !advanced.useModelDefaults ? { cfg_rate: advanced.cfgRate } : {}),
       });
       
       setModelStatus('模型已就绪');
       setAudioBuffer(buffer);
-      await playAudio(buffer, speedFactor);
+      setResult({ character: selectedRole.name, emotion: selectedEmotion,
+        version: selectedVersionId, speed: speedFactor, seed: advanced.seed });
+      await playAudio(buffer);
 
     } catch (error) {
       console.error('TTS合成错误:', error);
@@ -294,7 +296,7 @@ const SynthesisView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tts_${selectedCharacterName}_${selectedEmotion}_${Date.now()}.wav`;
+    a.download = `tts_${result?.character || selectedCharacterName}_${result?.emotion || selectedEmotion}_${Date.now()}.wav`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -309,7 +311,7 @@ const SynthesisView: React.FC = () => {
     >
       <div className="h-full grid grid-cols-1 md:grid-cols-12 gap-6 min-h-0">
         {/* LEFT: Configuration & Input (8 Cols) */}
-        <div className="theme-section col-span-1 md:col-span-8 rounded-3xl p-8 flex flex-col gap-6 tech-border relative min-h-0">
+        <div className="theme-section col-span-1 md:col-span-8 rounded-3xl p-6 lg:p-8 flex flex-col gap-5 tech-border relative min-h-0 overflow-y-auto">
           <div className="relative z-20 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <CustomSelect
               label="模型版本"
@@ -318,6 +320,7 @@ const SynthesisView: React.FC = () => {
               options={versions}
               onChange={setSelectedVersionId}
               isLoading={isLoadingVersions}
+              disabled={isProcessing}
               placeholder="选择版本"
               variant="filled"
             />
@@ -327,7 +330,7 @@ const SynthesisView: React.FC = () => {
               value={selectedWorldId.toString()}
               options={worlds.map(w => ({ id: w.id.toString(), name: w.name }))}
               onChange={(val) => setSelectedWorldId(Number(val))}
-              disabled={!selectedVersionId}
+              disabled={isProcessing || !selectedVersionId}
               isLoading={isLoadingWorlds}
               placeholder={!selectedVersionId ? "请先选择版本" : "选择世界"}
               variant="filled"
@@ -353,14 +356,19 @@ const SynthesisView: React.FC = () => {
               isLoadingEmotions={isLoadingEmotions}
               speedFactor={speedFactor}
               setSpeedFactor={setSpeedFactor}
+              disabled={isProcessing}
             />
           </div>
 
-          <div className="relative z-10 flex-1 flex flex-col min-h-0">
+          <SynthesisAdvanced version={selectedVersionId} value={advanced}
+            onChange={setAdvanced} disabled={isProcessing} />
+
+          <div className="relative z-10 flex-1 flex flex-col min-h-[200px]">
             <SynthesisInput
               text={text}
               setText={setText}
               isProcessing={isProcessing}
+              isReady={isReady}
               selectedEmotion={selectedEmotion}
               handleGenerate={handleGenerate}
             />
@@ -382,7 +390,8 @@ const SynthesisView: React.FC = () => {
             audioBuffer={audioBuffer}
             stopAudio={stopAudio}
             handleDownload={handleDownload}
-            speedFactor={speedFactor}
+            speedFactor={result?.speed ?? speedFactor}
+            resultLabel={result ? `${result.character} / ${result.emotion} / ${result.version} · ${result.seed === -1 ? '随机种子' : `种子 ${result.seed}`}` : undefined}
           />
 
           {/* Error Message */}

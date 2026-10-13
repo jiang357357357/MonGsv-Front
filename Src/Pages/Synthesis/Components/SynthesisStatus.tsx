@@ -8,6 +8,7 @@ interface SynthesisStatusProps {
   stopAudio: () => void;
   handleDownload: () => void;
   speedFactor: number;
+  resultLabel?: string;
 }
 
 const WAVE_BARS = [26, 52, 38, 68, 44, 76, 58, 70, 42, 62, 34, 50];
@@ -18,6 +19,7 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
   stopAudio,
   handleDownload,
   speedFactor,
+  resultLabel,
 }) => {
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -43,8 +45,8 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
     if (!previewAudioRef.current) {
       return;
     }
-    previewAudioRef.current.playbackRate = speedFactor;
-  }, [previewUrl, speedFactor]);
+    previewAudioRef.current.playbackRate = 1;
+  }, [previewUrl]);
 
   const hasAudio = Boolean(audioBuffer && previewUrl);
   const isActive = isPlaying || isPreviewPlaying;
@@ -88,6 +90,7 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
           <div className="theme-subtitle mt-2 text-sm leading-6">
             {hasAudio ? '结果已生成，可直接预览或下载。' : '完成一次合成后，这里会显示可播放的语音结果。'}
           </div>
+          {hasAudio && resultLabel ? <div className="theme-subtitle mt-2 text-xs leading-5">{resultLabel}</div> : null}
         </div>
         <div
           className={[

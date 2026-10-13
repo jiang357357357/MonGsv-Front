@@ -8,9 +8,7 @@ export const useAudioPlayer = () => {
 
   const ensureAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 24000,
-      });
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
     if (audioContextRef.current.state === 'suspended') {
       await audioContextRef.current.resume();
@@ -28,13 +26,13 @@ export const useAudioPlayer = () => {
     setIsPlaying(false);
   }, []);
 
-  const playAudio = useCallback(async (buffer: AudioBuffer, speedFactor: number = 1.0) => {
+  const playAudio = useCallback(async (buffer: AudioBuffer) => {
     stopAudio();
     const ctx = await ensureAudioContext();
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
-    source.playbackRate.value = speedFactor;
+    source.playbackRate.value = 1;
     source.onended = () => {
       source.disconnect();
       if (sourceNodeRef.current === source) {

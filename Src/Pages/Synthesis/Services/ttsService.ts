@@ -38,13 +38,13 @@ export const mapLanguageToCode = (lang: string): string => {
   return LANGUAGE_CODE_MAP[lang] || lang;
 };
 
-const decodeAudioBuffer = async (arrayBuffer: ArrayBuffer): Promise<AudioBuffer> => {
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-  try {
-    return await audioContext.decodeAudioData(arrayBuffer.slice(0));
-  } finally {
-    await audioContext.close();
+const decodeAudioBuffer = async (arrayBuffer: ArrayBuffer, sampleRate: number): Promise<AudioBuffer> => {
+  if (!Number.isInteger(sampleRate) || sampleRate <= 0) {
+    throw new Error('后端未返回有效的音频采样率');
   }
+  // Decode at the model's native rate; a playback context would resample to the device's rate.
+  const context = new OfflineAudioContext(1, 1, sampleRate);
+  return await context.decodeAudioData(arrayBuffer.slice(0));
 };
 
 const decodeBase64Audio = (value: string): ArrayBuffer => {
@@ -80,6 +80,7 @@ export const synthesizeSpeech = async (params: TTSRequestParams): Promise<AudioB
   if (params.top_p !== undefined) formData.append('top_p', params.top_p.toString());
   if (params.temperature !== undefined) formData.append('temperature', params.temperature.toString());
   if (params.speed !== undefined) formData.append('speed', params.speed.toString());
+  if (params.seed !== undefined) formData.append('seed', params.seed.toString());
   if (params.sample_steps !== undefined) formData.append('sample_steps', params.sample_steps.toString());
   if (params.cfg_rate !== undefined) formData.append('cfg_rate', params.cfg_rate.toString());
   if (params.if_sr !== undefined) formData.append('if_sr', String(params.if_sr));
@@ -106,7 +107,7 @@ export const synthesizeSpeech = async (params: TTSRequestParams): Promise<AudioB
     throw new Error('后端未返回音频数据');
   }
 
-  return await decodeAudioBuffer(decodeBase64Audio(payload.audio_data));
+  return await decodeAudioBuffer(decodeBase64Audio(payload.audio_data), payload.sample_rate);
 };
 
 export const synthesizeByRoleEmotion = async (params: RoleEmotionSynthesisParams): Promise<AudioBuffer> => {
@@ -135,7 +136,7 @@ export const synthesizeByRoleEmotion = async (params: RoleEmotionSynthesisParams
     throw new Error('后端未返回音频数据');
   }
 
-  return await decodeAudioBuffer(decodeBase64Audio(payload.audio_data));
+  return await decodeAudioBuffer(decodeBase64Audio(payload.audio_data), payload.sample_rate);
 };
 
 export const loadTTSModels = async (gptPath: string, sovitsPath: string): Promise<TTSLoadModelsResponse> => {

@@ -5,6 +5,7 @@ interface SynthesisInputProps {
   text: string;
   setText: (text: string) => void;
   isProcessing: boolean;
+  isReady: boolean;
   selectedEmotion: string;
   handleGenerate: () => void;
 }
@@ -13,11 +14,12 @@ const SynthesisInput: React.FC<SynthesisInputProps> = ({
   text,
   setText,
   isProcessing,
+  isReady,
   selectedEmotion,
   handleGenerate,
 }) => {
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-3">
+    <div className="flex-1 flex flex-col min-h-[200px] space-y-3">
       <label className="theme-title flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]">
         <Sparkles className="theme-accent-text w-4 h-4" />
         文本输入
@@ -30,6 +32,7 @@ const SynthesisInput: React.FC<SynthesisInputProps> = ({
             className="theme-input w-full h-full text-lg rounded-[32px] p-8 resize-none transition-all font-medium leading-relaxed"
             placeholder="在此输入想要合成的文本..."
             value={text}
+            disabled={isProcessing}
             onChange={(e) => setText(e.target.value)}
           />
           <div className="absolute bottom-6 right-6 flex items-center gap-3 opacity-0 group-focus-within:opacity-100 transition-opacity">
@@ -38,14 +41,14 @@ const SynthesisInput: React.FC<SynthesisInputProps> = ({
         </div>
 
         {/* Action Button - Vertical Alignment with Textarea */}
-        <div className="w-48 flex flex-col shrink-0">
+        <div className="w-24 sm:w-40 flex flex-col shrink-0">
           <button 
             onClick={handleGenerate}
-            disabled={isProcessing || !text.trim() || !selectedEmotion}
+            disabled={isProcessing || !isReady || !text.trim() || !selectedEmotion}
             className={`flex-1 rounded-[32px] font-black flex flex-col items-center justify-center gap-4 transition-all text-xs tracking-widest uppercase px-4 text-center border ${
               isProcessing 
               ? 'theme-status-block-warning animate-pulse cursor-wait' 
-              : !text.trim() || !selectedEmotion
+              : !isReady || !text.trim() || !selectedEmotion
               ? 'theme-button-disabled'
               : 'theme-button-amber'
             }`}

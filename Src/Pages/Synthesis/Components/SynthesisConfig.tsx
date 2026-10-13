@@ -22,6 +22,7 @@ interface SynthesisConfigProps {
   isLoadingEmotions: boolean;
   speedFactor: number;
   setSpeedFactor: (speed: number) => void;
+  disabled: boolean;
 }
 
 const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
@@ -42,6 +43,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
   isLoadingEmotions,
   speedFactor,
   setSpeedFactor,
+  disabled,
 }) => {
   const inferenceModeOptions = [
     { id: 'normal', name: '普通推理' },
@@ -61,6 +63,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             options={characters.map(name => ({ id: name, name }))}
             onChange={setSelectedCharacterName}
             isLoading={isLoadingCharacters}
+            disabled={disabled}
             placeholder={isLoadingCharacters ? "加载中..." : selectedWorldId === '' ? "请先选择世界" : characters.length === 0 ? "暂无角色" : "选择角色"}
             variant="filled"
           />
@@ -74,6 +77,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             value={selectedLang}
             options={LANGUAGES.map(l => ({ id: l, name: l }))}
             onChange={setSelectedLang}
+            disabled={disabled}
             variant="filled"
           />
         </div>
@@ -92,6 +96,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             }))}
             onChange={setSelectedEmotion}
             isLoading={isLoadingEmotions}
+            disabled={disabled}
             placeholder={isLoadingEmotions ? "正在同步情感矩阵..." : emotions.length === 0 ? "当前角色暂无情感数据" : "选择情感风格"}
             className="w-full"
             variant="filled"
@@ -105,6 +110,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             value={selectedCutMethod}
             options={CUT_METHODS.map(method => ({ id: method, name: method }))}
             onChange={setSelectedCutMethod}
+            disabled={disabled}
             className="w-full"
             variant="filled"
           />
@@ -117,6 +123,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             value={selectedInferenceMode}
             options={inferenceModeOptions}
             onChange={setSelectedInferenceMode}
+            disabled={disabled}
             className="w-full"
             variant="filled"
           />
@@ -134,6 +141,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
             <div 
               className="flex items-center gap-3 mt-1"
               onWheel={(e) => {
+                if (disabled) return;
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? -0.01 : 0.01;
                 const newValue = Math.max(0.5, Math.min(2.0, speedFactor + delta));
@@ -146,6 +154,8 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
                 max="2.0" 
                 step="0.01" 
                 value={speedFactor} 
+                disabled={disabled}
+                aria-label="语速滑块"
                 onChange={(e) => setSpeedFactor(parseFloat(e.target.value))}
                 className="flex-1 accent-[var(--color-amber-400)] h-2 bg-[var(--color-gray-300)] rounded-lg appearance-none cursor-pointer"
               />
@@ -156,6 +166,8 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
                   max="2.0"
                   step="0.01"
                   value={speedFactor.toFixed(2)}
+                  disabled={disabled}
+                  aria-label="语速系数"
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
                     if (!isNaN(value) && value >= 0.5 && value <= 2.0) {
@@ -163,6 +175,7 @@ const SynthesisConfig: React.FC<SynthesisConfigProps> = ({
                     }
                   }}
                   onWheel={(e) => {
+                    if (disabled) return;
                     e.stopPropagation();
                     const delta = e.deltaY > 0 ? -0.01 : 0.01;
                     const newValue = Math.max(0.5, Math.min(2.0, speedFactor + delta));
