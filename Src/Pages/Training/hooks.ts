@@ -18,7 +18,7 @@ export const useTrainingWorkbench = (params: TrainingParams, files: File[]) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const refreshHistory = useCallback(async () => {
-    try { setHistory((await getWorkbenchHistory()).runs); }
+    try { setHistory((await getWorkbenchHistory()).runs); setError(null); }
     catch (err) { setError(err instanceof Error ? err.message : '读取训练历史失败'); }
   }, []);
   useEffect(() => { void refreshHistory(); }, [refreshHistory]);

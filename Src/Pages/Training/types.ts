@@ -21,6 +21,7 @@ export interface TrainingParams {
   gptLearningRate: number;
   sovitsLearningRate: number;
   saveEveryEpoch: number;
+  logInterval: number;
   loraRank: number;
   gradCheckpoint: boolean;
   fp16: boolean;

@@ -76,7 +76,7 @@ export const startWorkbenchTraining = async (params: TrainingParams, audioFiles:
     sovits_batch_size: params.sovitsBatchSize, sovits_total_epoch: params.sovitsEpoch,
     training_order: params.trainingOrder, gpu_numbers: params.gpuNumbers || '0',
     gpt_learning_rate: params.gptLearningRate, sovits_learning_rate: params.sovitsLearningRate,
-    save_every_epoch: params.saveEveryEpoch, lora_rank: params.loraRank,
+    save_every_epoch: params.saveEveryEpoch, lora_rank: params.loraRank, log_interval: params.logInterval,
     grad_checkpoint: params.gradCheckpoint, fp16: params.fp16,
   }));
   if (params.trainingMode === 'fresh' && params.preprocessingMode === 'full') {

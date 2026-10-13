@@ -17,7 +17,7 @@ const initial: TrainingParams = {
   roleMode: 'existing', version: 'v5turbo', language: 'zh', worldName: '', characterName: '',
   preprocessingMode: 'cached', trainingMode: 'fresh', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '',
   inputAudioDir: '', listFile: '', outputDir: '', trainSovits: true, trainGpt: true, trainingOrder: 'sovits_first',
-  gpuNumbers: '0', gptLearningRate: 0.01, sovitsLearningRate: 0.0001, saveEveryEpoch: 1,
+  gpuNumbers: '0', gptLearningRate: 0.01, sovitsLearningRate: 0.0001, saveEveryEpoch: 1, logInterval: 10,
   loraRank: 32, gradCheckpoint: true, fp16: true, ...defaults('v5turbo'),
 };
 const emptyWorkspace: WorkbenchWorkspaceResponse = { versions: [], resume_choices: [] };
@@ -145,7 +145,7 @@ const Workbench: React.FC = () => {
                 <div className="grid gap-4 md:grid-cols-2">
                   <CustomSelect label="所属世界" value={params.worldName || ''} options={worlds.map(w => ({ id: w.name, name: w.name }))} disabled={busy} onChange={worldName => { setFiles([]); setParams(previous => ({ ...previous, worldName, characterName: '', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' })); }} placeholder="选择世界" variant="filled" />
                   <CustomSelect label="模型版本" value={params.version} options={versions.map(v => ({ id: v, name: v }))} disabled={busy} onChange={setVersion} variant="filled" />
-                  {params.roleMode === 'existing' ? <CustomSelect label="已有角色" value={params.characterName} options={roles.map(name => ({ id: name, name }))} disabled={busy || !params.worldName} onChange={characterName => setParams(previous => ({ ...previous, characterName, sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' }))} placeholder="选择角色" variant="filled" /> : field('characterName', '新角色名称')}
+                  {params.roleMode === 'existing' ? <CustomSelect label="已有角色" value={params.characterName} options={[...new Set([...roles, ...(params.characterName ? [params.characterName] : [])])].map(name => ({ id: name, name }))} disabled={busy || !params.worldName} onChange={characterName => setParams(previous => ({ ...previous, characterName, sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' }))} placeholder="选择角色" variant="filled" /> : field('characterName', '新角色名称')}
                   {field('gpuNumbers', 'GPU 编号（如 0 或 0,1）')}
                 </div>
                 {duplicate && <p className="mt-3 text-sm text-red-600">角色已存在，使用已有角色可以新增模型版本。</p>}
@@ -220,6 +220,7 @@ const Workbench: React.FC = () => {
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   {field('sovitsLearningRate', 'SoVITS 学习率', 'number', '0.00001')}{field('gptLearningRate', 'GPT 学习率', 'number', '0.001')}
                   {field('saveEveryEpoch', '每隔几轮保存', 'number')}{params.version.startsWith('v5') || ['v3', 'v4'].includes(params.version) ? field('loraRank', 'LoRA rank', 'number') : null}
+                  {field('logInterval', 'SoVITS 每隔几步记录 Loss', 'number')}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-5 text-sm"><label><input name="gradCheckpoint" type="checkbox" checked={params.gradCheckpoint} onChange={change} disabled={busy} className="mr-2" />梯度检查点（节省显存）</label><label><input name="fp16" type="checkbox" checked={params.fp16} onChange={change} disabled={busy} className="mr-2" />混合精度</label></div>
               </details>
