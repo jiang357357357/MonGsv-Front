@@ -12,7 +12,18 @@ export interface TrainingPhase {
 }
 
 export interface TrainingParams {
-  preprocessingMode: 'full' | 'existing';
+  preprocessingMode: 'full' | 'existing' | 'cached';
+  roleMode: 'new' | 'existing';
+  trainingMode: 'fresh' | 'resume';
+  sourceVersion: string;
+  sourceWorkspace: string;
+  resumeWorkspace: string;
+  gptLearningRate: number;
+  sovitsLearningRate: number;
+  saveEveryEpoch: number;
+  loraRank: number;
+  gradCheckpoint: boolean;
+  fp16: boolean;
   version: string;
   language: string;
   worldId?: number | null;

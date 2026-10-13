@@ -1,6 +1,7 @@
 import { getApiBaseUrl } from '../../../../System/Config';
 import { createLogger } from '../../../../System/Log/logger';
 import { FullTrainingRequest, StartGptTrainingRequest, StartSovitsTrainingRequest } from './trainingRequests';
+import { TrainingParams } from '../types';
 import {
   FullTrainingWorkflowResponse,
   TrainingLaunchResponse,
@@ -34,7 +35,55 @@ export interface RoleWorkspaceInfo {
   sliced_dir: string;
   raw_files: string[];
   model_sliced_files?: string[];
+  model_root?: string;
+  train_root?: string;
 }
+
+export interface WorkbenchWorkspaceResponse {
+  versions: { version: string; workspace: string; text_lines: number; has_features: boolean; has_semantic: boolean }[];
+  resume_choices: { workspace: string; version: string; gpt: boolean; sovits: boolean; lora_ranks: number[]; label: string }[];
+}
+
+const workbenchRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${getApiBaseUrl()}/training/workbench${path}`, init);
+  if (!response.ok) throw new Error(await parseError(response, '训练请求失败'));
+  return response.json() as Promise<T>;
+};
+
+export const getWorkbenchWorkspaces = (worldName: string, roleName: string) =>
+  workbenchRequest<WorkbenchWorkspaceResponse>(`/workspaces?${new URLSearchParams({ world_name: worldName, project_name: roleName })}`);
+
+export const getWorkbenchHistory = () => workbenchRequest<{ runs: TrainingWorkflowStatus[] }>('/runs');
+export const getWorkbenchStatus = (id: string) => workbenchRequest<TrainingWorkflowStatus>(`/runs/${encodeURIComponent(id)}`);
+export const stopWorkbenchTraining = (id: string) => workbenchRequest<TrainingWorkflowStatus>(`/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
+export const getWorkbenchLogs = (id: string, target: string) => workbenchRequest<{ text: string; log_file: string }>(`/runs/${encodeURIComponent(id)}/logs?${new URLSearchParams({ target })}`);
+export const generateWorkbenchPreview = (id: string, text: string, emotion: string, seed: number) =>
+  workbenchRequest<{ success: boolean; audio_data: string; sample_rate: number; audio_path: string }>(`/runs/${encodeURIComponent(id)}/preview`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion, seed }),
+  });
+
+export const startWorkbenchTraining = async (params: TrainingParams, audioFiles: File[], target: 'selected' | 'gpt' | 'sovits') => {
+  const form = new FormData();
+  form.append('options', JSON.stringify({
+    project_name: params.characterName.trim(), world_name: params.worldName?.trim(), version: params.version,
+    role_mode: params.roleMode, preprocessing_mode: params.preprocessingMode,
+    source_version: params.sourceVersion, source_workspace: params.sourceWorkspace,
+    input_audio_dir: params.inputAudioDir, list_file: params.listFile, language: params.language,
+    training_mode: params.trainingMode, resume_workspace: params.resumeWorkspace,
+    train_gpt: target === 'selected' ? params.trainGpt : target === 'gpt',
+    train_sovits: target === 'selected' ? params.trainSovits : target === 'sovits',
+    gpt_batch_size: params.gptBatchSize, gpt_total_epoch: params.gptEpoch,
+    sovits_batch_size: params.sovitsBatchSize, sovits_total_epoch: params.sovitsEpoch,
+    training_order: params.trainingOrder, gpu_numbers: params.gpuNumbers || '0',
+    gpt_learning_rate: params.gptLearningRate, sovits_learning_rate: params.sovitsLearningRate,
+    save_every_epoch: params.saveEveryEpoch, lora_rank: params.loraRank,
+    grad_checkpoint: params.gradCheckpoint, fp16: params.fp16,
+  }));
+  if (params.trainingMode === 'fresh' && params.preprocessingMode === 'full') {
+    audioFiles.forEach(file => form.append('audio_files', file));
+  }
+  return workbenchRequest<FullTrainingWorkflowResponse>('/start', { method: 'POST', body: form });
+};
 
 export interface LocalDialogResponse {
   success: boolean;

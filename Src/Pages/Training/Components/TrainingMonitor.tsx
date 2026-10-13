@@ -29,7 +29,7 @@ const TrainingMonitor: React.FC<TrainingMonitorProps> = ({
         <div className="flex items-center gap-2">
           <Cpu className={`w-4 h-4 ${isTraining ? 'theme-accent-text' : 'theme-kicker'}`} />
           <span className="theme-subtitle text-xs font-bold">
-            {isTraining ? '训练进行中' : error ? '训练出错' : '等待开始'}
+            {isTraining ? '训练进行中' : error ? '训练出错' : allFinished ? '训练完成' : Object.values(phaseStatuses).includes('stopped') ? '已停止' : '等待开始'}
           </span>
         </div>
         <div className="flex items-center gap-2">

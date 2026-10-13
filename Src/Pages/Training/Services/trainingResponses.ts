@@ -55,7 +55,7 @@ export interface FullTrainingWorkflowResponse {
 
 export type TrainingTargetName = 'gpt' | 'sovits';
 export type TrainingTargetStatus = 'pending' | 'starting' | 'running' | 'completed' | 'failed' | 'stopped';
-export type TrainingWorkflowState = 'queued' | 'running' | 'completed' | 'failed' | 'stopped';
+export type TrainingWorkflowState = 'queued' | 'running' | 'completed' | 'failed' | 'stopped' | 'interrupted';
 
 export interface TrainingWorkflowTarget {
   target: TrainingTargetName;
@@ -64,6 +64,15 @@ export interface TrainingWorkflowTarget {
   launch: Record<string, unknown> | null;
   details: TrainingStatusPayload | null;
   error: string | null;
+  model?: string;
+  telemetry?: {
+    current_epoch: number;
+    total_epochs: number;
+    current_loss: number | null;
+    loss_tag: string | null;
+    loss_history: { step: number; value: number; time: number }[];
+    telemetry_error?: string | null;
+  };
 }
 
 export interface TrainingWorkflowStatus {
@@ -77,6 +86,18 @@ export interface TrainingWorkflowStatus {
   targets: TrainingWorkflowTarget[];
   dataset: Record<string, unknown>;
   error: string | null;
+  world_name?: string;
+  created_at?: string;
+  phase?: string;
+  current_stage?: string;
+  stop_requested?: boolean;
+  preprocessing?: Record<string, string>;
+  options?: Record<string, any>;
+  preview?: {
+    gpt_path: string;
+    sovits_path: string;
+    emotions: { name: string; language: string; text: string; path: string }[];
+  } | null;
 }
 
 export interface TrainingStatusPayload {

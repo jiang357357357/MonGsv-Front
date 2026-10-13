@@ -2,6 +2,24 @@
   color: #1f2d3d;
 }
 
+.training-workbench .training-preview-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.training-workbench .training-preview-fields > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .training-workbench .training-preview-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .training-workbench .theme-section-sunken {
   background: #e8eff7;
   border-color: #c2cfdd;
