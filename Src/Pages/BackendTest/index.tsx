@@ -100,7 +100,7 @@ const TEST_MODULES: TestModule[] = [
   },
 ];
 
-const VERSION_OPTIONS = ['v1', 'v2', 'v4', 'v2Pro', 'v2ProPlus'] as const;
+const VERSION_OPTIONS = ['v1', 'v2', 'v3', 'v4', 'v2Pro', 'v2ProPlus', 'v5dev', 'v5turbo'] as const;
 const LANGUAGE_OPTIONS = ['zh', 'yue', 'en', 'ja', 'ko', 'auto'] as const;
 const BOOLEAN_OPTIONS = ['true', 'false'] as const;
 const TRAINING_ORDER_OPTIONS = ['sovits_first', 'gpt_first'] as const;
