@@ -69,6 +69,11 @@ export interface TrainingWorkflowTarget {
     current_epoch: number;
     total_epochs: number;
     current_loss: number | null;
+    current_loss_epoch?: number | null;
+    current_loss_kind?: 'mean' | 'sample' | null;
+    epoch_loss_history?: { epoch: number; value: number | null; step: number | null; time: number | null; kind: 'mean' | 'sample' | 'missing' }[];
+    epoch_loss_source?: 'epoch_mean' | 'step_sample' | 'mixed' | 'unavailable';
+    missing_epochs?: number[];
     loss_tag: string | null;
     loss_history: { step: number; value: number; time: number }[];
     telemetry_error?: string | null;

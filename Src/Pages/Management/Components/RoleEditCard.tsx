@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Users, Globe2, Cpu, Zap, AlertCircle, Loader2, Edit2, Settings2 } from 'lucide-react';
 import { WorldInfo, ModelInfo, VersionInfo } from '../types';
+import { formatModelVersion } from '../../../Public/modelVersions';
 
 interface RoleEditCardProps {
 	isOpen: boolean;
@@ -122,7 +123,7 @@ const RoleEditCard: React.FC<RoleEditCardProps> = ({
 							>
 								<option value="">选择基础版本...</option>
 								{versions.map(v => (
-									<option key={v.name} value={v.name}>{v.name}</option>
+									<option key={v.name} value={v.name}>{formatModelVersion(v.name)}</option>
 								))}
 							</select>
 						</div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Database, Users, Trash2 } from 'lucide-react';
 import { VersionInfo, RoleInfo } from '../../types';
+import { formatModelVersion } from '../../../../Public/modelVersions';
 
 interface VersionsPageProps {
 	versions: VersionInfo[];
@@ -19,7 +20,7 @@ const VersionsPage: React.FC<VersionsPageProps> = ({
 }) => {
 	const [versionQuery, setVersionQuery] = useState('');
 	const versionFilter = versionQuery.toLowerCase();
-	const filteredVersions = versions.filter((v) => v.name.toLowerCase().includes(versionFilter));
+	const filteredVersions = versions.filter((v) => formatModelVersion(v.name).toLowerCase().includes(versionFilter));
 
 	return (
 		<div className="flex flex-col lg:flex-row gap-6 h-full min-h-0">
@@ -56,7 +57,7 @@ const VersionsPage: React.FC<VersionsPageProps> = ({
 								<div className={`p-1.5 rounded-lg ${selectedVersion === version.name ? 'bg-[rgba(255,255,255,0.1)]' : 'theme-section-soft'}`}>
 									<Database className={`w-4 h-4 ${selectedVersion === version.name ? 'text-[var(--color-text-inverse)]' : 'theme-kicker group-hover:text-[var(--color-amber-500)]'}`} />
 								</div>
-								<span className="font-bold text-sm truncate">{version.name}</span>
+								<span className="font-bold text-sm truncate">{formatModelVersion(version.name)}</span>
 							</div>
 							{version.isCurrent && (
 								<span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${selectedVersion === version.name ? 'theme-amber-gradient' : 'theme-tag-amber'}`}>
@@ -94,7 +95,7 @@ const VersionsPage: React.FC<VersionsPageProps> = ({
 						<h4 className="theme-title text-sm font-bold">该基础版本下的角色</h4>
 						{selectedVersion && (
 							<span className="theme-tag px-2 py-0.5 text-[10px] rounded-md font-mono">
-								{selectedVersion}
+								{formatModelVersion(selectedVersion)}
 							</span>
 						)}
 					</div>
@@ -132,7 +133,7 @@ const VersionsPage: React.FC<VersionsPageProps> = ({
 											)}
 											{role.sov_model_name && (
 												<span className="theme-tag-violet text-[10px] font-medium px-1.5 py-0.5 rounded-md flex items-center gap-1">
-													<span className="w-1 h-1 bg-[rgba(114,80,184,0.75)] rounded-full" />
+													<span className="w-1 h-1 bg-[var(--color-amber-400)] rounded-full" />
 													SOV: {role.sov_model_name}
 												</span>
 											)}

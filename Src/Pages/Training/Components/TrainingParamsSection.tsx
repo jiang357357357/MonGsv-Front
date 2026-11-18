@@ -8,44 +8,34 @@ interface TrainingParamsSectionProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }
 
-const TrainingParamsSection: React.FC<TrainingParamsSectionProps> = ({ params, isTraining, onChange }) => {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="theme-section flex flex-1 flex-col gap-4 rounded-xl p-5">
-          <div className="theme-title flex items-center gap-3 text-base font-black">
-            <BrainCircuit className="h-5 w-5" /> SoVITS 参数
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="training-param-field flex items-center gap-3">
-              <label htmlFor="sovitsBatchSize" className="theme-subtitle whitespace-nowrap text-sm font-black">Batch</label>
-              <input id="sovitsBatchSize" name="sovitsBatchSize" value={params.sovitsBatchSize} onChange={onChange} type="number" disabled={isTraining} className="theme-input training-param-input rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black transition-all disabled:opacity-50" />
-            </div>
-            <div className="training-param-field flex items-center gap-3">
-              <label htmlFor="sovitsEpoch" className="theme-subtitle whitespace-nowrap text-sm font-black">Epoch</label>
-              <input id="sovitsEpoch" name="sovitsEpoch" value={params.sovitsEpoch} onChange={onChange} type="number" disabled={isTraining} className="theme-input training-param-input rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black transition-all disabled:opacity-50" />
-            </div>
-          </div>
+const TrainingParamsSection: React.FC<TrainingParamsSectionProps> = ({ params, isTraining, onChange }) => (
+  <div className="training-model-params-grid">
+    {([
+      { target: 'sovits', name: 'SoVITS', enabled: params.trainSovits, toggle: 'trainSovits', batch: 'sovitsBatchSize', epoch: 'sovitsEpoch', description: '学习角色的音色与发声特点', Icon: BrainCircuit },
+      { target: 'gpt', name: 'GPT', enabled: params.trainGpt, toggle: 'trainGpt', batch: 'gptBatchSize', epoch: 'gptEpoch', description: '学习语句节奏与表达方式', Icon: Box },
+    ] as const).map(model => (
+      <section key={model.target} className={'training-model-params ' + (model.enabled ? 'is-enabled' : '')}>
+        <div className="training-model-params-header">
+          <div className="training-model-title"><model.Icon size={18} /><strong>{model.name}</strong></div>
+          <label className="training-model-toggle">
+            <input aria-label={'训练 ' + model.name} name={model.toggle} type="checkbox" checked={model.enabled} disabled={isTraining} onChange={onChange} />
+            {model.enabled ? '已选择' : '未选择'}
+          </label>
         </div>
-
-        <div className="theme-section flex flex-1 flex-col gap-4 rounded-xl p-5">
-          <div className="theme-title flex items-center gap-3 text-base font-black">
-            <Box className="h-5 w-5" /> GPT 参数
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="training-param-field flex items-center gap-3">
-              <label htmlFor="gptBatchSize" className="theme-subtitle whitespace-nowrap text-sm font-black">Batch</label>
-              <input id="gptBatchSize" name="gptBatchSize" value={params.gptBatchSize} onChange={onChange} type="number" disabled={isTraining} className="theme-input training-param-input rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black transition-all disabled:opacity-50" />
-            </div>
-            <div className="training-param-field flex items-center gap-3">
-              <label htmlFor="gptEpoch" className="theme-subtitle whitespace-nowrap text-sm font-black">Epoch</label>
-              <input id="gptEpoch" name="gptEpoch" value={params.gptEpoch} onChange={onChange} type="number" disabled={isTraining} className="theme-input training-param-input rounded-xl bg-[rgba(255,255,255,0.94)] px-4 py-3 text-center text-lg font-black transition-all disabled:opacity-50" />
-            </div>
-          </div>
+        <p>{model.description}</p>
+        <div className="training-model-fields">
+          <label className="training-field" htmlFor={model.batch}>
+            <span>每批样本 · Batch</span>
+            <input id={model.batch} aria-label={model.name + ' Batch'} name={model.batch} value={params[model.batch]} onChange={onChange} type="number" min="1" step="1" disabled={isTraining || !model.enabled} className="training-control" />
+          </label>
+          <label className="training-field" htmlFor={model.epoch}>
+            <span>训练轮数 · Epoch</span>
+            <input id={model.epoch} aria-label={model.name + ' Epoch'} name={model.epoch} value={params[model.epoch]} onChange={onChange} type="number" min="1" step="1" disabled={isTraining || !model.enabled} className="training-control" />
+          </label>
         </div>
-      </div>
-    </div>
-  );
-};
+      </section>
+    ))}
+  </div>
+);
 
 export default TrainingParamsSection;

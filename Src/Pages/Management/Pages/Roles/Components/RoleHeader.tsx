@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Plus } from 'lucide-react';
 import { WorldInfo, VersionInfo } from '../../../types';
 import CustomSelect from '../../../../Emotion/Components/CustomSelect';
+import { formatModelVersion } from '../../../../../Public/modelVersions';
 
 interface RoleHeaderProps {
 	activeTab: 'worlds' | 'roles';
@@ -77,7 +78,7 @@ const RoleHeader: React.FC<RoleHeaderProps> = ({
 						>
 							<option value="all">所有版本</option>
 							{versions.map(v => (
-								<option key={v.name} value={v.name}>{v.name}</option>
+								<option key={v.name} value={v.name}>{formatModelVersion(v.name)}</option>
 							))}
 						</select>
 					</div>

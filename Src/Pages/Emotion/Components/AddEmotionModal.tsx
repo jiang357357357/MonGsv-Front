@@ -26,6 +26,9 @@ interface AddEmotionModalProps {
   defaultLanguage?: string;
   slicedDirectory?: string;
   slicedAudioFiles?: string[];
+  isLoadingSlicedAudio?: boolean;
+  slicedAudioError?: string | null;
+  onReloadSlicedAudio?: () => void;
   existingEmotions: string[];
   error: string | null;
   onErrorChange: (error: string | null) => void;
@@ -40,6 +43,9 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
   defaultLanguage = 'zh',
   slicedDirectory = '',
   slicedAudioFiles = [],
+  isLoadingSlicedAudio = false,
+  slicedAudioError = null,
+  onReloadSlicedAudio,
   existingEmotions,
   error,
   onErrorChange,
@@ -185,6 +191,7 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
   const handleTranscribe = async () => {
     if (!audioFile && !selectedSlicedAudioPath) return;
 
+    onErrorChange(null);
     setIsTranscribing(true);
     try {
       const request = audioFile
@@ -372,27 +379,34 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
                 <Music className="w-5 h-5" /> 音频采样文件
               </label>
 
-              {slicedDirectory && (
-                <div className="theme-section-soft rounded-[24px] p-4 space-y-3">
+                <div className="theme-section-soft rounded-[24px] p-4 space-y-3" aria-busy={isLoadingSlicedAudio}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                      <p className="theme-title text-sm font-black tracking-tight">角色切分目录</p>
-                      <p className="theme-kicker text-[10px] font-bold leading-relaxed break-all">{slicedDirectory}</p>
+                      <p className="theme-title text-sm font-black tracking-tight" title={slicedDirectory}>从切分列表选择</p>
+                      <p className="theme-kicker text-xs leading-relaxed">使用当前角色、当前版本训练时的音频片段。</p>
                     </div>
                     <span className="theme-tag shrink-0 text-[10px] font-mono uppercase tracking-[0.16em] px-2 py-1 rounded-full">
-                      {slicedAudioFiles.length} clips
+                      {isLoadingSlicedAudio ? '加载中' : `${slicedAudioFiles.length} 条`}
                     </span>
                   </div>
 
-                  {slicedAudioFiles.length > 0 ? (
+                  {slicedAudioError ? (
+                    <div role="alert" className="theme-status-block-danger rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+                      <span>切分列表加载失败：{slicedAudioError}</span>
+                      <button type="button" onClick={onReloadSlicedAudio} disabled={isAdding || isLoadingSlicedAudio} className="theme-button-secondary shrink-0 rounded-lg px-3 py-2">重新加载</button>
+                    </div>
+                  ) : isLoadingSlicedAudio ? (
+                    <p role="status" className="theme-kicker flex items-center gap-2 text-xs"><Loader2 className="h-4 w-4 animate-spin" />正在加载切分音频…</p>
+                  ) : slicedAudioFiles.length > 0 ? (
                     <div className="space-y-2">
                       <CustomSelect
                         value={selectedSlicedAudioPath}
                         options={slicedAudioOptions}
                         onChange={handleSlicedAudioSelect}
-                        placeholder="从角色 sliced 目录选择采样音频"
+                        placeholder="选择切分音频"
                         variant="filled"
                         searchable
+                        disabled={isAdding}
                       />
                       <p className="theme-kicker text-[10px] font-bold tracking-[0.08em] px-1">
                         可直接使用该角色当前版本切分好的音频，无需重新上传。
@@ -400,11 +414,10 @@ const AddEmotionModal: React.FC<AddEmotionModalProps> = ({
                     </div>
                   ) : (
                     <p className="theme-kicker text-[10px] font-bold tracking-[0.08em] px-1">
-                      当前目录还没有可用的切分音频，请继续拖拽或上传本地文件。
+                        当前角色和版本暂无可用的切分音频，可以先完成训练数据切分，或上传本地音频。
                     </p>
                   )}
                 </div>
-              )}
               
               {hasSelectedAudio && previewAudioUrl ? (
                 <div className="theme-section-soft rounded-[24px] p-5 space-y-4">

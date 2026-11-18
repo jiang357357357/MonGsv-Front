@@ -41,6 +41,7 @@ interface RoleWorkspaceListResponse {
 }
 
 export interface RoleWorkspaceInfo {
+  role_id?: number;
   role_name: string;
   world_name?: string | null;
   base_version?: string | null;
@@ -51,6 +52,7 @@ export interface RoleWorkspaceInfo {
 }
 
 export interface RoleWorkspaceQuery {
+  roleId?: number;
   roleName?: string;
   worldName?: string;
   baseVersion?: string;
@@ -259,6 +261,7 @@ export const getRoleWorkspaces = async (
 ): Promise<RoleWorkspaceInfo[]> => {
   const baseUrl = getApiBaseUrl();
   const params = new URLSearchParams();
+  if (query.roleId !== undefined) params.set('role_id', String(query.roleId));
   if (query.roleName) params.set('role_name', query.roleName);
   if (query.worldName) params.set('world_name', query.worldName);
   if (query.baseVersion) params.set('base_version', query.baseVersion);

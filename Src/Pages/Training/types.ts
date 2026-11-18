@@ -20,7 +20,6 @@ export interface TrainingParams {
   resumeWorkspace: string;
   gptLearningRate: number;
   sovitsLearningRate: number;
-  saveEveryEpoch: number;
   logInterval: number;
   loraRank: number;
   gradCheckpoint: boolean;
@@ -43,6 +42,11 @@ export interface TrainingParams {
   gptEpoch: number;
   gpuNumbers?: string;
 }
+
+export type TrainingPreset = Pick<TrainingParams,
+  'gptBatchSize' | 'sovitsBatchSize' | 'gptEpoch' | 'sovitsEpoch' |
+  'gptLearningRate' |
+  'sovitsLearningRate' | 'loraRank' | 'gradCheckpoint' | 'fp16' | 'logInterval'>;
 
 export type TrainingStepStatus = 'pending' | 'starting' | 'processing' | 'completed' | 'error' | 'stopped' | 'skipped';
 export type TrainingPhaseStatus = 'pending' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'stopped' | 'skipped';

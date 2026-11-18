@@ -5,6 +5,7 @@ import ModelIdentitySection from '../../Components/ModelIdentitySection';
 import TrainingParamsSection from '../../Components/TrainingParamsSection';
 import { TrainingParams } from '../../types';
 import { WorldInfo, RoleInfo } from '../../Services/trainingApi';
+import { formatModelVersion } from '../../../../Public/modelVersions';
 
 interface TrainingConfigPageProps {
   params: TrainingParams;
@@ -82,7 +83,7 @@ const TrainingConfigPage: React.FC<TrainingConfigPageProps> = ({
               label="模型版本"
               icon={<Layers className="theme-accent-text w-4 h-4" />}
               value={params.version}
-              options={versions.map((v) => ({ id: v, name: v }))}
+              options={versions.map((v) => ({ id: v, name: formatModelVersion(v) }))}
               onChange={onVersionChange}
               disabled={!params.worldName}
               isLoading={isLoadingVersions}

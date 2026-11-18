@@ -1,7 +1,7 @@
 import { getApiBaseUrl } from '../../../../System/Config';
 import { createLogger } from '../../../../System/Log/logger';
 import { FullTrainingRequest, StartGptTrainingRequest, StartSovitsTrainingRequest } from './trainingRequests';
-import { TrainingParams } from '../types';
+import { TrainingParams, TrainingPreset } from '../types';
 import {
   FullTrainingWorkflowResponse,
   TrainingLaunchResponse,
@@ -44,9 +44,16 @@ export interface WorkbenchWorkspaceResponse {
   resume_choices: { workspace: string; version: string; gpt: boolean; sovits: boolean; lora_ranks: number[]; label: string }[];
 }
 
+export class TrainingRequestError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'TrainingRequestError';
+  }
+}
+
 const workbenchRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${getApiBaseUrl()}/training/workbench${path}`, init);
-  if (!response.ok) throw new Error(await parseError(response, '训练请求失败'));
+  if (!response.ok) throw new TrainingRequestError(response.status, await parseError(response, '训练请求失败'));
   return response.json() as Promise<T>;
 };
 
@@ -54,6 +61,19 @@ export const getWorkbenchWorkspaces = (worldName: string, roleName: string) =>
   workbenchRequest<WorkbenchWorkspaceResponse>(`/workspaces?${new URLSearchParams({ world_name: worldName, project_name: roleName })}`);
 
 export const getWorkbenchHistory = () => workbenchRequest<{ runs: TrainingWorkflowStatus[] }>('/runs');
+export const getWorkbenchDefaults = async (): Promise<Record<string, TrainingPreset>> => {
+  const result = await workbenchRequest<{versions: Record<string, {
+    gpt_batch_size: number; sovits_batch_size: number; gpt_total_epoch: number; sovits_total_epoch: number;
+    gpt_learning_rate: number;
+    sovits_learning_rate: number; lora_rank: number; grad_checkpoint: boolean; fp16: boolean; log_interval: number;
+  }>}>('/defaults');
+  return Object.fromEntries(Object.entries(result.versions).map(([version, value]) => [version, {
+    gptBatchSize: value.gpt_batch_size, sovitsBatchSize: value.sovits_batch_size,
+    gptEpoch: value.gpt_total_epoch, sovitsEpoch: value.sovits_total_epoch,
+    gptLearningRate: value.gpt_learning_rate, sovitsLearningRate: value.sovits_learning_rate,
+    loraRank: value.lora_rank, gradCheckpoint: value.grad_checkpoint, fp16: value.fp16, logInterval: value.log_interval,
+  }]));
+};
 export const getWorkbenchStatus = (id: string) => workbenchRequest<TrainingWorkflowStatus>(`/runs/${encodeURIComponent(id)}`);
 export const stopWorkbenchTraining = (id: string) => workbenchRequest<TrainingWorkflowStatus>(`/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
 export const getWorkbenchLogs = (id: string, target: string) => workbenchRequest<{ text: string; log_file: string }>(`/runs/${encodeURIComponent(id)}/logs?${new URLSearchParams({ target })}`);
@@ -76,7 +96,8 @@ export const startWorkbenchTraining = async (params: TrainingParams, audioFiles:
     sovits_batch_size: params.sovitsBatchSize, sovits_total_epoch: params.sovitsEpoch,
     training_order: params.trainingOrder, gpu_numbers: params.gpuNumbers || '0',
     gpt_learning_rate: params.gptLearningRate, sovits_learning_rate: params.sovitsLearningRate,
-    save_every_epoch: params.saveEveryEpoch, lora_rank: params.loraRank, log_interval: params.logInterval,
+    gpt_save_every_epoch: params.gptEpoch, sovits_save_every_epoch: params.sovitsEpoch,
+    lora_rank: params.loraRank, log_interval: params.logInterval,
     grad_checkpoint: params.gradCheckpoint, fp16: params.fp16,
   }));
   if (params.trainingMode === 'fresh' && params.preprocessingMode === 'full') {

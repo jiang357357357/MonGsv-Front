@@ -82,7 +82,7 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
   };
 
   return (
-    <div className="theme-section flex-1 rounded-[32px] p-6 flex flex-col gap-5 min-h-0">
+    <div className="theme-section flex-1 rounded-[32px] p-6 flex flex-col gap-5 min-h-0 overflow-y-auto">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="theme-kicker text-[10px] font-black uppercase tracking-widest">音频预览</div>
@@ -119,16 +119,16 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
         </div>
       ) : null}
 
-      <div className="flex-1 min-h-0 rounded-[28px] border border-[var(--color-border-soft)] bg-[rgba(243,246,248,0.84)] px-5 py-6">
+      <div className="flex-1 shrink-0 min-h-[260px] rounded-[28px] border border-[var(--color-border-soft)] bg-[var(--color-surface-soft)] px-5 py-6">
         {hasAudio ? (
-          <div className="flex h-full min-h-[280px] flex-col justify-center gap-6">
+          <div className="flex h-full min-h-[210px] flex-col justify-center gap-6">
             <div className="flex items-end justify-center gap-2">
               {WAVE_BARS.map((height, index) => (
                 <div
                   key={`${height}-${index}`}
                   className={[
                     'w-2 rounded-full transition-all duration-300',
-                    isActive ? 'bg-[var(--color-amber-400)] animate-waveform' : 'bg-[rgba(214,168,74,0.5)]',
+                    isActive ? 'bg-[var(--color-amber-400)] animate-waveform' : 'bg-[var(--color-amber-300)]',
                   ].join(' ')}
                   style={{
                     height: `${height}px`,
@@ -155,7 +155,7 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 text-center">
+          <div className="flex h-full min-h-[210px] flex-col items-center justify-center gap-4 text-center">
             <div className="theme-section-soft flex h-16 w-16 items-center justify-center rounded-2xl">
               <Activity className="h-7 w-7 text-[var(--color-gray-400)]" />
             </div>
@@ -177,7 +177,7 @@ const SynthesisStatus: React.FC<SynthesisStatusProps> = ({
           className={`w-full rounded-2xl py-4 text-sm font-black transition-all ${
             !hasAudio || !isActive
               ? 'theme-button-disabled'
-              : 'theme-button-secondary hover:border-[var(--color-amber-400)] hover:bg-[rgba(255,237,201,0.58)]'
+              : 'theme-button-secondary hover:border-[var(--color-amber-400)] hover:bg-[var(--color-surface-accent)]'
           }`}
         >
           <span className="flex items-center justify-center gap-2">

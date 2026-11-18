@@ -161,7 +161,7 @@ const TerminalView: React.FC = () => {
           {!isPaused && (
               <div className="flex items-center gap-2 mt-2 animate-pulse">
                   <span className="theme-accent-text">➜</span>
-                  <div className="w-1.5 h-4 bg-[rgba(182,118,24,0.5)]"></div>
+                  <div className="w-1.5 h-4 bg-[var(--component-sidebar-accent)]"></div>
               </div>
           )}
           <div ref={bottomRef} />

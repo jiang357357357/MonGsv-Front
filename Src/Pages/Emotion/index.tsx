@@ -16,6 +16,7 @@ import EmotionList from './Components/EmotionList';
 import EmotionEditor from './Components/EmotionEditor';
 import AddEmotionModal from './Components/AddEmotionModal';
 import MainLayout from '../../Public/Components/Shared/MainLayout';
+import { formatModelVersion } from '../../Public/modelVersions';
 import { createLogger } from '../../../System/Log/logger';
 import { getApiBaseUrl } from '../../../System/Config';
 import { AppView } from '../../types';
@@ -29,6 +30,9 @@ const EmotionConfigView: React.FC = () => {
   const [emotions, setEmotions] = useState<EmotionInfo[]>([]);
   const [roleWorkspaces, setRoleWorkspaces] = useState<RoleWorkspaceInfo[]>([]);
   const [selectedWorkspaceDetails, setSelectedWorkspaceDetails] = useState<RoleWorkspaceInfo | null>(null);
+  const [isLoadingSlicedAudio, setIsLoadingSlicedAudio] = useState(false);
+  const [slicedAudioError, setSlicedAudioError] = useState<string | null>(null);
+  const [workspaceReloadKey, setWorkspaceReloadKey] = useState(0);
   
   // Loading states
   const [isLoadingWorlds, setIsLoadingWorlds] = useState(false);
@@ -69,16 +73,16 @@ const EmotionConfigView: React.FC = () => {
     }
 
     const matchingWorkspaces = roleWorkspaces.filter((workspace) =>
-      workspace.role_name === selectedCharacterName &&
+      (workspace.role_id !== undefined ? workspace.role_id === selectedRole?.id : workspace.role_name === selectedCharacterName) &&
       (workspace.base_version || '') === selectedVersionId,
     );
 
     return matchingWorkspaces.find((workspace) =>
       (workspace.world_name || '') === (selectedWorld?.name || ''),
     ) || matchingWorkspaces[0] || null;
-  }, [roleWorkspaces, selectedCharacterName, selectedVersionId, selectedWorld?.name]);
+  }, [roleWorkspaces, selectedCharacterName, selectedRole?.id, selectedVersionId, selectedWorld?.name]);
   const selectedWorkspace = selectedWorkspaceDetails &&
-    selectedWorkspaceDetails.role_name === selectedCharacterName &&
+    (selectedWorkspaceDetails.role_id !== undefined ? selectedWorkspaceDetails.role_id === selectedRole?.id : selectedWorkspaceDetails.role_name === selectedCharacterName) &&
     (selectedWorkspaceDetails.base_version || '') === selectedVersionId &&
     (!selectedWorld?.name || (selectedWorkspaceDetails.world_name || '') === selectedWorld.name)
       ? selectedWorkspaceDetails
@@ -143,18 +147,22 @@ const EmotionConfigView: React.FC = () => {
   // Only load the current workspace's potentially large file lists when the
   // add-emotion dialog actually needs them.
   useEffect(() => {
-    if (!isAddModalOpen || !selectedCharacterName || !selectedVersionId) {
+    if (!isAddModalOpen || !selectedRole || !selectedVersionId) {
       setSelectedWorkspaceDetails(null);
+      setIsLoadingSlicedAudio(false);
+      setSlicedAudioError(null);
       return;
     }
 
     let cancelled = false;
     setSelectedWorkspaceDetails(null);
+    setIsLoadingSlicedAudio(true);
+    setSlicedAudioError(null);
 
     const loadWorkspaceDetails = async () => {
       try {
         const workspaces = await getRoleWorkspaces({
-          roleName: selectedCharacterName,
+          roleId: selectedRole.id,
           worldName: selectedWorld?.name || undefined,
           baseVersion: selectedVersionId,
           includeFiles: true,
@@ -164,10 +172,13 @@ const EmotionConfigView: React.FC = () => {
         }
       } catch (err) {
         if (!cancelled) {
+          setSlicedAudioError(err instanceof Error ? err.message : '加载切分音频失败');
           logger.warn('加载当前角色音频列表失败', {
             error: err instanceof Error ? err.message : String(err),
           });
         }
+      } finally {
+        if (!cancelled) setIsLoadingSlicedAudio(false);
       }
     };
 
@@ -175,7 +186,7 @@ const EmotionConfigView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAddModalOpen, selectedCharacterName, selectedVersionId, selectedWorld?.name]);
+  }, [isAddModalOpen, selectedCharacterName, selectedRole?.id, selectedVersionId, selectedWorld?.name, workspaceReloadKey]);
 
   // Load worlds on mount
   useEffect(() => {
@@ -569,7 +580,7 @@ const EmotionConfigView: React.FC = () => {
               label="模型版本"
               icon={<Layers className="theme-accent-icon w-4 h-4" />}
               value={selectedVersionId}
-              options={availableVersions.map((version) => ({ id: version, name: version }))}
+              options={availableVersions.map((version) => ({ id: version, name: formatModelVersion(version) }))}
               onChange={handleVersionChange}
               disabled={!selectedCharacterName}
               placeholder={!selectedCharacterName ? "请先选择角色" : "选择版本"}
@@ -662,6 +673,9 @@ const EmotionConfigView: React.FC = () => {
            defaultLanguage={selectedRole?.language || 'zh'}
            slicedDirectory={selectedSlicedDirectory}
            slicedAudioFiles={selectedSlicedAudioFiles}
+           isLoadingSlicedAudio={isLoadingSlicedAudio}
+           slicedAudioError={slicedAudioError}
+           onReloadSlicedAudio={() => setWorkspaceReloadKey(value => value + 1)}
            existingEmotions={emotions.map(e => e.emotion)}
            error={error}
            onErrorChange={setError}

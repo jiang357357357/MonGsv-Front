@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TrainingParams, TrainingPhaseStatuses, TrainingStepStatus } from './types';
 import { TrainingWorkflowStatus } from './Services/trainingResponses';
-import { getWorkbenchHistory, getWorkbenchStatus, startWorkbenchTraining, stopWorkbenchTraining } from './Services/trainingApi';
+import { getWorkbenchHistory, getWorkbenchStatus, startWorkbenchTraining, stopWorkbenchTraining, TrainingRequestError } from './Services/trainingApi';
 import { TRAINING_PHASES } from './constants';
 
 const STORAGE_KEY = 'trainingWorkbenchActiveRun';
@@ -35,6 +35,12 @@ export const useTrainingWorkbench = (params: TrainingParams, files: File[]) => {
         else void refreshHistory();
       } catch (err) {
         if (disposed) return;
+        if (err instanceof TrainingRequestError && err.status === 404) {
+          localStorage.removeItem(STORAGE_KEY);
+          setSelectedId(''); setWorkflow(null); setError(null);
+          void refreshHistory();
+          return;
+        }
         setError(err instanceof Error ? err.message : '查询训练状态失败');
         timer = setTimeout(poll, 5000);
       }

@@ -166,11 +166,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                     className={`px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between group/opt cursor-pointer ${
                       value === option.id 
                         ? 'theme-button-primary shadow-lg' 
-                        : 'theme-subtitle hover:bg-[rgba(255,237,201,0.6)] hover:text-[var(--color-amber-500)]'
+                        : 'theme-subtitle hover:bg-[var(--color-surface-accent)] hover:text-[var(--color-amber-500)]'
                     }`}
                   >
                     <span className="truncate tracking-tight">{option.name}</span>
-                    {value === option.id && <Check className="theme-accent-text w-4 h-4" />}
+                    {value === option.id && <Check className="w-4 h-4 text-[var(--color-text-inverse)]" />}
                   </div>
                 ))}
               </div>

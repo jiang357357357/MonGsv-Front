@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
+        'import.meta.env.VITE_MON_GSV_PORT': JSON.stringify(monConfig.backendPort),
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.MON_GSV_PORT': JSON.stringify(monConfig.backendPort),

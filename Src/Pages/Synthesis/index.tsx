@@ -9,12 +9,13 @@ import { fetchWorlds } from '../Management/Services/managementApi';
 import MainLayout from '../../Public/Components/Shared/MainLayout';
 import CustomSelect from '../Emotion/Components/CustomSelect';
 import { AppView } from '../../types';
+import { formatModelVersion } from '../../Public/modelVersions';
 
 // New Components
 import SynthesisConfig from './Components/SynthesisConfig';
 import SynthesisInput from './Components/SynthesisInput';
 import SynthesisStatus from './Components/SynthesisStatus';
-import SynthesisAdvanced, { samplingDefaults, SynthesisAdvancedSettings } from './Components/SynthesisAdvanced';
+import SynthesisAdvanced, { SAMPLE_STEP_OPTIONS, samplingDefaults, SynthesisAdvancedSettings } from './Components/SynthesisAdvanced';
 import { audioBufferToWavBlob } from './audioUtils';
 
 const SynthesisView: React.FC = () => {
@@ -67,7 +68,7 @@ const SynthesisView: React.FC = () => {
           getVersions(), fetchWorlds(), getCharacters(),
         ]);
         if (cancelled) return;
-        setVersions(versionList.map(version => ({ id: version, name: version })));
+        setVersions(versionList.map(version => ({ id: version, name: formatModelVersion(version) })));
         setWorlds(worldList);
         const readyRoles = roleList.filter(role => role.gpt_model_path && role.sov_model_path
           && versionList.includes(role.version || '') && worldList.some(world => world.id === role.world_id));
@@ -236,12 +237,12 @@ const SynthesisView: React.FC = () => {
       return;
     }
     if ((supportsSteps && !advanced.useModelDefaults
-      && (!Number.isInteger(advanced.sampleSteps) || advanced.sampleSteps < 1 || advanced.sampleSteps > 128))
-      || (isV5 && !advanced.useModelDefaults && (advanced.cfgRate < 0 || advanced.cfgRate > 10))
+      && !SAMPLE_STEP_OPTIONS.some(steps => steps === advanced.sampleSteps))
+      || (isV5 && !advanced.useModelDefaults && (advanced.cfgRate < 0 || advanced.cfgRate > 2))
       || !Number.isInteger(advanced.topK) || advanced.topK < 1 || advanced.topK > 100
-      || advanced.topP <= 0 || advanced.topP > 1 || advanced.temperature <= 0 || advanced.temperature > 2
-      || advanced.pauseSecond < 0 || advanced.pauseSecond > 5) {
-      setError('请检查高级参数：步数 1–128，CFG 0–10，Top K 1–100，Top P 0–1（不含 0），温度 0–2（不含 0），停顿 0–5 秒');
+      || advanced.topP < 0 || advanced.topP > 1 || advanced.temperature < 0 || advanced.temperature > 1
+      || advanced.pauseSecond < 0.1 || advanced.pauseSecond > 0.5) {
+      setError('请检查高级参数：步数 4、8、16、32，CFG 0–2，Top K 1–100，Top P 和温度 0–1，停顿 0.1–0.5 秒');
       return;
     }
 
@@ -269,9 +270,9 @@ const SynthesisView: React.FC = () => {
         top_p: advanced.topP,
         temperature: advanced.temperature,
         pause_second: advanced.pauseSecond,
-        // Omit these values to preserve the installed model's defaults.
-        ...(supportsSteps && !advanced.useModelDefaults ? { sample_steps: advanced.sampleSteps } : {}),
-        ...(isV5 && !advanced.useModelDefaults ? { cfg_rate: advanced.cfgRate } : {}),
+        // Send the WebUI defaults explicitly: the official API defaults V4 to 32 instead of 8.
+        ...(supportsSteps ? { sample_steps: advanced.useModelDefaults ? samplingDefaults(selectedVersionId).sampleSteps : advanced.sampleSteps } : {}),
+        ...(isV5 ? { cfg_rate: advanced.useModelDefaults ? samplingDefaults(selectedVersionId).cfgRate : advanced.cfgRate } : {}),
       });
       
       setModelStatus('模型已就绪');

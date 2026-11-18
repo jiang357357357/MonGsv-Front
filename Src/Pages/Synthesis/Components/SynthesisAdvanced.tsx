@@ -13,9 +13,11 @@ export interface SynthesisAdvancedSettings {
 }
 
 export const samplingDefaults = (version: string) => ({
-  sampleSteps: version === 'v5turbo' ? 4 : 32,
+  sampleSteps: version === 'v5turbo' ? 4 : ['v3', 'v5dev'].includes(version) ? 32 : 8,
   cfgRate: version === 'v5dev' ? 1.3 : 0,
 });
+
+export const SAMPLE_STEP_OPTIONS = [4, 8, 16, 32] as const;
 
 interface Props {
   version: string;
@@ -54,7 +56,7 @@ const SynthesisAdvanced: React.FC<Props> = ({ version, value, onChange, disabled
         <SlidersHorizontal className="mr-2 inline h-4 w-4" />
         <span>高级合成参数</span>
         <span className="theme-subtitle ml-3 text-xs font-normal">
-          {supportsSteps ? `${value.useModelDefaults ? '模型默认' : '自定义'} · ${value.useModelDefaults ? defaults.sampleSteps : value.sampleSteps} 步` : '文本采样'}
+          {supportsSteps ? `${value.useModelDefaults ? '官方默认' : '自定义'} · ${value.useModelDefaults ? defaults.sampleSteps : value.sampleSteps} 步` : '文本采样'}
           {isV5 ? ` · CFG ${value.useModelDefaults ? defaults.cfgRate : value.cfgRate}` : ''}
           {` · ${value.seed === -1 ? '随机种子' : `种子 ${value.seed}`}`}
         </span>
@@ -65,24 +67,40 @@ const SynthesisAdvanced: React.FC<Props> = ({ version, value, onChange, disabled
             <label className="flex items-center gap-2 text-xs font-bold">
               <input type="checkbox" checked={value.useModelDefaults}
                 onChange={(event) => onChange({ ...value, useModelDefaults: event.target.checked, ...defaults })} />
-              使用模型默认采样
+              使用官方默认采样
             </label>
             {isV5 ? <p className="theme-subtitle text-xs">Turbo 默认 4 步 / CFG 0；Dev 默认 32 步 / CFG 1.3。</p> : null}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {numberField('sampleSteps', '采样步数', 1, 128, 1, value.useModelDefaults)}
-              {isV5 ? numberField('cfgRate', 'CFG 系数', 0, 10, 0.1, value.useModelDefaults) : null}
+              <label className="flex min-w-0 flex-col gap-2 text-xs font-bold">
+                采样步数
+                <select
+                  aria-label="采样步数"
+                  value={value.useModelDefaults ? defaults.sampleSteps : value.sampleSteps}
+                  disabled={disabled || value.useModelDefaults}
+                  onChange={(event) => onChange({ ...value, sampleSteps: Number(event.target.value) })}
+                  className="theme-input w-full rounded-xl px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  {SAMPLE_STEP_OPTIONS.map(steps => <option key={steps} value={steps}>{steps}</option>)}
+                </select>
+              </label>
+              {isV5 ? numberField('cfgRate', 'CFG 系数', 0, 2, 0.05, value.useModelDefaults) : null}
             </div>
           </div>
         ) : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {numberField('seed', '随机种子（-1 为随机）', -1, 4294967295, 1)}
-          {numberField('pauseSecond', '句间停顿（秒）', 0, 5, 0.05)}
+          {numberField('pauseSecond', '句间停顿（秒）', 0.1, 0.5, 0.01)}
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {numberField('topK', 'Top K', 1, 100, 1)}
-          {numberField('topP', 'Top P', 0.01, 1, 0.01)}
-          {numberField('temperature', '温度', 0.01, 2, 0.01)}
+          {numberField('topP', 'Top P', 0, 1, 0.05)}
+          {numberField('temperature', '温度', 0, 1, 0.05)}
         </div>
+        <button type="button" className="theme-button-secondary rounded-xl px-3 py-2 text-xs font-bold"
+          onClick={() => onChange({ useModelDefaults: true, ...defaults, seed: -1,
+            topK: 15, topP: 1, temperature: 1, pauseSecond: 0.3 })}>
+          恢复官方默认
+        </button>
         <p className="theme-subtitle text-xs leading-5">固定种子便于比较参数。语速在合成时生效，试听和下载保持相同的语速。</p>
       </fieldset>
     </details>

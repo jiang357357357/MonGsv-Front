@@ -27,7 +27,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
 	const hasSov = role.sov_model_id || role.sov_model?.id;
 
 	return (
-		<div className="theme-card group relative flex min-h-[250px] flex-col justify-between overflow-hidden rounded-[1.75rem] border-2 border-[var(--color-border-strong)] bg-[rgba(255,255,255,0.92)] p-5 shadow-[0_1px_0_rgba(255,255,255,0.72)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-amber-400)]">
+		<div className="theme-card group relative flex min-h-[250px] flex-col justify-between overflow-hidden rounded-[1.75rem] border-2 border-[var(--color-border-strong)] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-amber-400)]">
 			<div className="mb-4 flex items-start justify-between">
 				<div className="flex items-center gap-3">
 					<div className="theme-section-soft rounded-2xl border border-[var(--color-border-default)] p-3 transition-colors">
@@ -79,7 +79,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
 				{/* SOV Model */}
 				<div className={`flex min-h-[48px] items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-colors ${
 					hasSov 
-						? 'text-[var(--color-blue-500)] bg-[rgba(220,238,254,0.5)] border-[rgba(94,153,216,0.22)]'
+						? 'theme-tag-blue'
 						: 'theme-tag opacity-60'
 				}`}>
 					<Zap className="h-3 w-3 shrink-0" />
@@ -89,7 +89,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
 				</div>
 
 				{role.language && (
-					<div className="theme-status-success flex min-h-[48px] items-center gap-2.5 rounded-xl border border-[rgba(35,136,87,0.18)] bg-[rgba(238,249,241,0.72)] px-3 py-2.5 text-[11px] font-medium">
+					<div className="theme-status-block-success flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 py-2.5 text-[11px] font-medium">
 						<Languages className="h-3 w-3 shrink-0" />
 						<span className="truncate font-bold uppercase">{role.language}</span>
 					</div>

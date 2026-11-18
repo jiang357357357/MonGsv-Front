@@ -1,80 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { Server, Save, RefreshCcw, CheckCircle2, AlertCircle, Globe } from 'lucide-react';
-import { getApiConfig, saveApiConfig, type ApiConfig } from '../../../../System/Config';
-
-// 从构建时注入的环境变量获取默认配置
-const DEFAULT_PORT = parseInt(process.env.MON_GSV_PORT || '7020', 10);
+import React, { useState } from 'react';
+import { Server, Save, RefreshCcw, CheckCircle2, AlertCircle, Globe, LoaderCircle } from 'lucide-react';
+import { buildApiBaseUrl, getApiConfig, getDefaultApiConfig, normalizeApiConfig, saveApiConfig, type ApiConfig } from '../../../../System/Config';
+import { testApiConnection, type ApiConnectionResult } from '../Services/apiConnection';
 
 const ApiConfigView: React.FC = () => {
-  const [config, setConfig] = useState<ApiConfig>({ baseUrl: 'localhost', port: DEFAULT_PORT, basePath: '/Core' });
+  const [config, setConfig] = useState<ApiConfig>(getApiConfig);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [fullUrl, setFullUrl] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [isTesting, setIsTesting] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<ApiConnectionResult | null>(null);
+  let fullUrl = '';
+  try {
+    fullUrl = buildApiBaseUrl(config);
+  } catch {
+    // Keep the form editable while an address or port is incomplete.
+  }
 
-  // 获取API配置（从localStorage读取，如果没有则使用默认值）
-  useEffect(() => {
-    const savedConfig = getApiConfig();
-    setConfig(savedConfig);
-  }, []);
-
-  // 更新完整URL
-  useEffect(() => {
-    const normalize = (p?: string) => {
-      if (!p) return '';
-      const noTrailing = String(p).replace(/\/+$/g, '');
-      if (!noTrailing) return '';
-      return noTrailing.startsWith('/') ? noTrailing : `/${noTrailing}`;
-    };
-    const path = normalize(config.basePath);
-    setFullUrl(`http://${config.baseUrl}:${config.port}${path}`);
-  }, [config]);
+  const updateConfig = (changes: Partial<ApiConfig>) => {
+    setConfig(previous => ({ ...previous, ...changes }));
+    setSaveStatus('idle');
+    setSaveError('');
+    setConnectionResult(null);
+  };
 
   const handleBaseUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setConfig(prev => ({ ...prev, baseUrl: e.target.value }));
-    setSaveStatus('idle');
+    updateConfig({ baseUrl: e.target.value });
   };
 
   const handlePortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const port = parseInt(e.target.value) || 50007;
-    setConfig(prev => ({ ...prev, port }));
-    setSaveStatus('idle');
+    updateConfig({ port: Number(e.target.value) });
   };
 
   const handleBasePathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setConfig(prev => ({ ...prev, basePath: e.target.value }));
-    setSaveStatus('idle');
+    updateConfig({ basePath: e.target.value });
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus('idle');
+    setSaveError('');
 
     try {
-      // 验证配置
-      if (!config.baseUrl.trim()) {
-        throw new Error('基础URL不能为空');
-      }
-      if (config.port < 1 || config.port > 65535) {
-        throw new Error('端口号必须在1-65535之间');
-      }
-      const normalize = (p?: string) => {
-        if (!p) return '';
-        const noTrailing = String(p).replace(/\/+$/g, '');
-        if (!noTrailing) return '';
-        return noTrailing.startsWith('/') ? noTrailing : `/${noTrailing}`;
-      };
-      const normalizedBasePath = normalize(config.basePath);
-      const toSave: ApiConfig = { ...config, basePath: normalizedBasePath };
+      const toSave = normalizeApiConfig(config);
       setConfig(toSave);
       saveApiConfig(toSave);
-      
-      // 可以在这里添加测试连接的逻辑
-      // const testResult = await testConnection(fullUrl);
-      
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       setSaveStatus('error');
+      setSaveError(error instanceof Error ? error.message : '保存失败');
       console.error('Failed to save API config:', error);
     } finally {
       setIsSaving(false);
@@ -82,13 +57,22 @@ const ApiConfigView: React.FC = () => {
   };
 
   const handleReset = () => {
-    setConfig({ baseUrl: 'localhost', port: DEFAULT_PORT, basePath: '/Core' });
+    setConfig(getDefaultApiConfig());
     setSaveStatus('idle');
+    setSaveError('');
+    setConnectionResult(null);
   };
 
   const handleTestConnection = async () => {
-    // 这里可以添加测试连接的逻辑
-    alert(`测试连接: ${fullUrl}\n（此功能需要后端支持）`);
+    setIsTesting(true);
+    setConnectionResult(null);
+    try {
+      setConnectionResult(await testApiConnection(config));
+    } catch (error) {
+      setConnectionResult({ type: 'error', message: error instanceof Error ? error.message : '连接失败', url: '' });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   return (
@@ -104,6 +88,7 @@ const ApiConfigView: React.FC = () => {
         <div className="flex gap-3">
           <button
             onClick={handleReset}
+            disabled={isTesting}
             className="theme-button-secondary p-3 rounded-xl transition-colors"
             title="重置为默认值"
           >
@@ -111,7 +96,7 @@ const ApiConfigView: React.FC = () => {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isTesting}
             className={`px-4 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 ${
               isSaving
                 ? 'theme-button-disabled'
@@ -154,6 +139,7 @@ const ApiConfigView: React.FC = () => {
                 type="text"
                 id="api-base-url"
                 value={config.baseUrl}
+                disabled={isTesting}
                 onChange={handleBaseUrlChange}
                 placeholder="localhost 或 192.168.1.100"
                 aria-label="基础URL或IP地址"
@@ -179,6 +165,7 @@ const ApiConfigView: React.FC = () => {
                 type="number"
                 id="api-port"
                 value={config.port}
+                disabled={isTesting}
                 onChange={handlePortChange}
                 min="1"
                 max="65535"
@@ -202,14 +189,15 @@ const ApiConfigView: React.FC = () => {
                 type="text"
                 id="api-base-path"
                 value={config.basePath || ''}
+                disabled={isTesting}
                 onChange={handleBasePathChange}
-                placeholder="/Core，可留空"
+                placeholder="直接连接网关时留空"
                 aria-label="路径后缀"
                 className="theme-input w-full rounded-xl p-4 text-sm font-mono transition-all outline-none"
               />
             </div>
             <p className="theme-kicker text-[10px] font-mono">
-              例如 /Core，留空则不带后缀
+              直接连接本项目网关时请留空；通过带路径前缀的代理访问时再填写
             </p>
           </div>
 
@@ -225,7 +213,7 @@ const ApiConfigView: React.FC = () => {
                 role="textbox"
                 aria-label="完整API地址"
               >
-                {fullUrl}
+                {fullUrl || '请填写有效的 API 地址和端口'}
               </div>
             </div>
             <p className="theme-kicker text-[10px] font-mono">
@@ -234,14 +222,26 @@ const ApiConfigView: React.FC = () => {
           </div>
 
           {/* Test Connection Button */}
-          <div className="theme-divider pt-4 border-t">
+          {saveError && <p role="alert" className="theme-status-block-danger rounded-xl p-3 text-sm">{saveError}</p>}
+          <div className="theme-divider pt-4 border-t space-y-3">
             <button
               onClick={handleTestConnection}
+              disabled={isTesting}
               className="theme-button-secondary w-full py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-bold"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              测试连接
+              {isTesting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {isTesting ? '正在测试…' : '测试连接'}
             </button>
+            <p className="theme-kicker text-xs">测试使用当前填写的地址；修改后需保存配置。</p>
+            {connectionResult && (
+              <div role="status" aria-live="polite" className={`rounded-xl p-4 text-sm ${
+                connectionResult.type === 'success' ? 'theme-status-block-success'
+                  : connectionResult.type === 'warning' ? 'theme-status-block-warning' : 'theme-status-block-danger'
+              }`}>
+                <p>{connectionResult.message}</p>
+                {connectionResult.url && <p className="mt-2 break-all font-mono text-xs">{connectionResult.url}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>

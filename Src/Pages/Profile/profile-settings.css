@@ -1,84 +1,84 @@
 .profile-workbench {
-  color: #1f2d3d;
+  color: var(--color-text-primary);
 }
 
 .profile-workbench .profile-page-surface {
-  background: linear-gradient(180deg, #d6e2ee 0%, #d3deea 100%);
-  border-color: #afc0d1;
+  background: var(--color-surface-soft);
+  border-color: var(--color-border-default);
   box-shadow: none;
 }
 
 .profile-workbench .profile-tab {
-  background: #e3ebf4;
-  border-color: #bdcbda;
+  background: var(--color-surface-soft);
+  border-color: var(--color-border-default);
 }
 
 .profile-workbench .profile-tab:hover {
-  background: #edf4fb;
+  background: var(--color-surface-elevated);
 }
 
 .profile-workbench .profile-tab-active {
-  background: #ffffff;
-  border-color: #8eb1df;
+  background: var(--color-surface-accent);
+  border-color: var(--color-border-accent);
   box-shadow: none;
 }
 
 .profile-workbench .profile-tab-active .theme-title,
 .profile-workbench .profile-tab-active .theme-subtitle {
-  color: #1f4f8a;
+  color: var(--color-amber-500);
 }
 
 .profile-workbench .profile-tab-active .theme-nav-icon {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(125, 170, 230, 0.45);
-  color: #1f4f8a;
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border-info);
+  color: var(--color-amber-500);
 }
 
 .profile-workbench .profile-panel {
-  background: #ffffff;
-  border: 1px solid #c4d3e1;
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
   box-shadow: none;
 }
 
 .profile-workbench .profile-panel-soft {
-  background: rgba(245, 249, 253, 0.8);
-  border: 1px solid #cbd8e4;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border-soft);
 }
 
 .profile-workbench .theme-input {
-  background: #fcfeff;
-  border-color: #c9d4e0;
-  color: #1f2d3d;
+  background: var(--component-input-bg);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
 }
 
 .profile-workbench .theme-input:focus {
-  border-color: #7daae6;
+  border-color: var(--color-border-accent);
 }
 
 .profile-workbench .profile-upload-zone {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px dashed #b8c8d8;
+  background: var(--component-input-bg);
+  border: 1px dashed var(--color-border-default);
 }
 
 .profile-workbench .profile-upload-zone:hover,
 .profile-workbench .profile-upload-zone-active {
-  background: #f8fbff;
-  border-color: #7daae6;
+  background: var(--color-surface-accent);
+  border-color: var(--color-border-accent);
 }
 
 .profile-workbench .profile-test-meter {
   height: 10px;
-  background: #dfe7ef;
-  border: 1px solid #c7d3df;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-default);
 }
 
 .profile-workbench .profile-test-meter-fill {
   height: 100%;
   min-width: 0;
-  background: #d96a63;
+  background: var(--color-danger-500);
   transition: width 300ms ease;
 }
 
 .profile-workbench .profile-test-meter-pass {
-  background: #3ba777;
+  background: var(--color-success-500);
 }

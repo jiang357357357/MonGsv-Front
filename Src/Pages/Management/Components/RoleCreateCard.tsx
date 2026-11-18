@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Users, Globe2, AlertCircle, Loader2, Upload, Database, Settings2 } from 'lucide-react';
 import { WorldInfo, VersionInfo } from '../types';
+import { formatModelVersion } from '../../../Public/modelVersions';
 
 interface RoleCreateCardProps {
 	isOpen: boolean;
@@ -121,7 +122,7 @@ const RoleCreateCard: React.FC<RoleCreateCardProps> = ({
 								<option value="">选择基础版本...</option>
 								{versions.map((version) => (
 									<option key={version.name} value={version.name}>
-										{version.name}
+										{formatModelVersion(version.name)}
 									</option>
 								))}
 							</select>
@@ -138,7 +139,7 @@ const RoleCreateCard: React.FC<RoleCreateCardProps> = ({
 								onClick={() => gptInputRef.current?.click()}
 								className={`group relative flex h-28 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed p-4 transition-all ${
 									gptFile
-										? 'theme-status-block-info border-[rgba(94,153,216,0.18)]'
+										? 'theme-status-block-info border-[var(--color-border-info)]'
 										: 'theme-upload-zone'
 								}`}
 							>
@@ -169,7 +170,7 @@ const RoleCreateCard: React.FC<RoleCreateCardProps> = ({
 								onClick={() => sovInputRef.current?.click()}
 								className={`group relative flex h-28 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed p-4 transition-all ${
 									sovFile
-										? 'theme-status-block-warning border-[rgba(197,126,22,0.18)]'
+										? 'theme-status-block-warning border-[var(--color-border-accent)]'
 										: 'theme-upload-zone'
 								}`}
 							>

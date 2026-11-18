@@ -1,31 +1,49 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Database, FolderOpen, History, Layers, Play, Square, Upload } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Check, ChevronDown, ChevronRight, CircleHelp, Cpu, Database, FileAudio, FileText, FolderOpen, History, Layers, Play, Plus, RefreshCw, Settings2, Square, Upload, UserRound, X } from 'lucide-react';
 import MainLayout from '../../Public/Components/Shared/MainLayout';
-import CustomSelect from '../Emotion/Components/CustomSelect';
 import { AppView } from '../../types';
-import { TrainingParams } from './types';
+import { formatModelVersion } from '../../Public/modelVersions';
+import { TrainingParams, TrainingPreset } from './types';
 import { useTrainingWorkbench } from './hooks';
-import { getRoleWorkspaces, getTrainingVersions, getWorkbenchWorkspaces, getWorlds, RoleWorkspaceInfo, selectLocalDirectory, selectLocalFile, WorkbenchWorkspaceResponse, WorldInfo } from './Services/trainingApi';
+import { getRoleWorkspaces, getTrainingVersions, getWorkbenchDefaults, getWorkbenchWorkspaces, getWorlds, RoleWorkspaceInfo, selectLocalDirectory, selectLocalFile, WorkbenchWorkspaceResponse, WorldInfo } from './Services/trainingApi';
 import { TrainingWorkflowStatus } from './Services/trainingResponses';
 import TrainingParamsSection from './Components/TrainingParamsSection';
 import TrainingMonitor from './Components/TrainingMonitor';
 import TrainingRunDetails from './Components/TrainingRunDetails';
 import './training-workbench.css';
 
-const defaults = (version: string) => ({ sovitsBatchSize: 4, sovitsEpoch: version.startsWith('v5') ? 12 : 8, gptBatchSize: version.startsWith('v5') ? 8 : 4, gptEpoch: version.startsWith('v5') ? 20 : 15 });
+// Batch values are placeholders until the backend supplies this machine's defaults.
+const initialPreset: TrainingPreset = {
+  sovitsBatchSize: 1, sovitsEpoch: 2, gptBatchSize: 1, gptEpoch: 15,
+  gptLearningRate: 0.01, sovitsLearningRate: 0.0001,
+  logInterval: 100,
+  loraRank: 32, gradCheckpoint: false, fp16: true,
+};
 const initial: TrainingParams = {
-  roleMode: 'existing', version: 'v5turbo', language: 'zh', worldName: '', characterName: '',
-  preprocessingMode: 'cached', trainingMode: 'fresh', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '',
+  roleMode: 'new', version: 'v5turbo', language: 'zh', worldName: '', characterName: '',
+  preprocessingMode: 'full', trainingMode: 'fresh', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '',
   inputAudioDir: '', listFile: '', outputDir: '', trainSovits: true, trainGpt: true, trainingOrder: 'sovits_first',
-  gpuNumbers: '0', gptLearningRate: 0.01, sovitsLearningRate: 0.0001, saveEveryEpoch: 1, logInterval: 10,
-  loraRank: 32, gradCheckpoint: true, fp16: true, ...defaults('v5turbo'),
+  gpuNumbers: '0', ...initialPreset,
 };
 const emptyWorkspace: WorkbenchWorkspaceResponse = { versions: [], resume_choices: [] };
 const statusNames: Record<string, string> = { queued: '排队中', running: '进行中', completed: '已完成', failed: '失败', stopped: '已停止', interrupted: '监控中断' };
 const isAudio = (file: File) => file.type.startsWith('audio/') || /\.(wav|mp3|flac|m4a|ogg|aac|opus|wma)$/i.test(file.name);
 
+const SectionHeading: React.FC<{ step: string; title: string; description: string; action?: React.ReactNode }> = ({ step, title, description, action }) => (
+  <div className="training-section-heading">
+    <div className="training-section-intro">
+      <span className="training-step-number">{step}</span>
+      <div><h2>{title}</h2><p>{description}</p></div>
+    </div>
+    {action}
+  </div>
+);
+
 const Workbench: React.FC = () => {
   const [params, setParams] = useState<TrainingParams>(initial);
+  const [presets, setPresets] = useState<Record<string, TrainingPreset>>({});
+  const [defaultsLoading, setDefaultsLoading] = useState(true);
+  const [defaultsError, setDefaultsError] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [versions, setVersions] = useState<string[]>([]);
@@ -40,6 +58,17 @@ const Workbench: React.FC = () => {
   const directoryInput = useRef<HTMLInputElement>(null);
   const training = useTrainingWorkbench(params, files);
   const busy = training.isTraining;
+  const defaults = (version: string) => presets[version] || initialPreset;
+  const loadDefaults = async () => {
+    setDefaultsLoading(true); setDefaultsError('');
+    try {
+      const values = await getWorkbenchDefaults();
+      setPresets(values);
+      setParams(previous => previous.trainingMode === 'resume' ? previous : { ...previous, ...values[previous.version] });
+    } catch (err) { setDefaultsError(err instanceof Error ? err.message : '读取训练默认配置失败'); }
+    finally { setDefaultsLoading(false); }
+  };
+  useEffect(() => { void loadDefaults(); }, []);
 
   const refreshResources = async () => {
     const results = await Promise.allSettled([getWorlds(), getTrainingVersions(), getRoleWorkspaces()]);
@@ -51,7 +80,7 @@ const Workbench: React.FC = () => {
   };
   useEffect(() => { void refreshResources(); }, []);
   useEffect(() => { if (training.workflow?.status === 'completed') void refreshResources(); }, [training.workflow?.workflow_id, training.workflow?.status]);
-  useEffect(() => { directoryInput.current?.setAttribute('webkitdirectory', ''); }, [params.preprocessingMode]);
+  useEffect(() => { directoryInput.current?.setAttribute('webkitdirectory', ''); }, [params.preprocessingMode, params.trainingMode, panel]);
   useEffect(() => {
     if (!files[0]) { setSourceAudio(''); return; }
     const url = URL.createObjectURL(files[0]); setSourceAudio(url);
@@ -82,16 +111,16 @@ const Workbench: React.FC = () => {
   const roles = useMemo(() => [...new Set(roleWorkspaces.filter(w => w.world_name === params.worldName).map(w => w.role_name))], [roleWorkspaces, params.worldName]);
   const resumeChoices = data.resume_choices.filter(choice => choice.version === params.version);
   const duplicate = params.roleMode === 'new' && roles.some(name => name.normalize('NFKC').toLocaleLowerCase() === params.characterName.trim().normalize('NFKC').toLocaleLowerCase());
-  const inputClass = 'theme-input w-full rounded-xl px-4 py-3 text-sm disabled:opacity-50';
-  const cardClass = 'theme-section rounded-xl p-5';
+  const inputClass = 'training-control';
+  const cardClass = 'training-card';
   const change = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setParams(previous => ({ ...previous, [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : type === 'number' ? Number(value) : value }));
   };
-  const field = (name: keyof TrainingParams, label: string, type = 'text', step?: string) => (
-    <label className="flex flex-col gap-2 text-sm font-bold" key={name}>
-      <span className="theme-subtitle">{label}</span>
-      <input name={name} aria-label={label} value={String(params[name] ?? '')} type={type} step={step} min={type === 'number' ? (step && Number(step) < 1 ? step : '1') : undefined} disabled={busy} onChange={change} className={inputClass} />
+  const field = (name: keyof TrainingParams, label: string, type = 'text', step?: string, placeholder?: string) => (
+    <label className="training-field" key={name}>
+      <span>{label}</span>
+      <input name={name} aria-label={label} value={String(params[name] ?? '')} placeholder={placeholder} type={type} step={step} min={type === 'number' ? (step && Number(step) < 1 ? step : '1') : undefined} disabled={busy || defaultsLoading} onChange={change} className={inputClass} />
     </label>
   );
   const setVersion = (version: string) => setParams(previous => ({ ...previous, version, resumeWorkspace: '', ...defaults(version) }));
@@ -99,7 +128,7 @@ const Workbench: React.FC = () => {
     setFiles([]);
     setParams(previous => ({ ...previous, roleMode, characterName: '', preprocessingMode: roleMode === 'existing' ? 'cached' : 'full', trainingMode: 'fresh', resumeWorkspace: '', sourceVersion: '', sourceWorkspace: '' }));
   };
-  const reason = !params.worldName ? '请选择所属世界' : !params.characterName.trim() ? '请选择或填写角色名' : !params.version ? '请选择模型版本'
+  const reason = defaultsLoading ? '正在读取训练默认配置' : defaultsError ? '训练默认配置加载失败，请重试' : !params.worldName ? '请选择所属世界' : !params.characterName.trim() ? '请选择或填写角色名' : !params.version ? '请选择模型版本'
     : duplicate ? '角色已存在，请切换到已有角色' : dataLoading ? '正在读取角色数据'
     : params.trainingMode === 'resume' ? !params.resumeWorkspace ? '请选择续训记录' : ''
     : params.preprocessingMode === 'cached' ? !params.sourceWorkspace ? '请选择可用的特征数据来源' : ''
@@ -118,132 +147,229 @@ const Workbench: React.FC = () => {
     const options = run.options || {};
     setParams({ ...initial, ...defaults(run.version), roleMode: 'existing', worldName: run.world_name || '', characterName: run.project_name, version: run.version,
       trainingMode: 'resume', resumeWorkspace: run.project_root, trainGpt: run.order.includes('gpt'), trainSovits: run.order.includes('sovits'),
-      gptEpoch: (options.gpt_total_epoch || 20) + 1, sovitsEpoch: (options.sovits_total_epoch || 12) + 1,
+      gptEpoch: (options.gpt_total_epoch ?? 15) + 1, sovitsEpoch: (options.sovits_total_epoch ?? defaults(run.version).sovitsEpoch) + 1,
+      gptBatchSize: options.gpt_batch_size ?? defaults(run.version).gptBatchSize,
+      sovitsBatchSize: options.sovits_batch_size ?? defaults(run.version).sovitsBatchSize,
+      gptLearningRate: options.gpt_learning_rate ?? defaults(run.version).gptLearningRate,
+      sovitsLearningRate: options.sovits_learning_rate ?? defaults(run.version).sovitsLearningRate,
+      gradCheckpoint: options.grad_checkpoint ?? defaults(run.version).gradCheckpoint,
+      fp16: options.fp16 ?? defaults(run.version).fp16,
+      logInterval: options.log_interval ?? defaults(run.version).logInterval,
       loraRank: options.lora_rank || 32, gpuNumbers: options.gpu_numbers || '0',
       sourceVersion: options.source_version || run.version, sourceWorkspace: options.source_workspace || run.project_root });
     setPanel('prepare');
   };
   const canStart = !busy && !reason;
+  const hasTargets = params.trainGpt || params.trainSovits;
+  const objectReady = Boolean(params.worldName && params.characterName.trim() && params.version && !duplicate);
+  const dataReady = !dataLoading && (params.trainingMode === 'resume' ? Boolean(params.resumeWorkspace)
+    : params.preprocessingMode === 'cached' ? Boolean(params.sourceWorkspace)
+    : params.preprocessingMode === 'existing' ? Boolean(params.inputAudioDir && params.listFile)
+    : Boolean(files.length || params.inputAudioDir));
+  const preparation = [
+    { label: '选择训练对象', ready: objectReady },
+    { label: params.trainingMode === 'resume' ? '选择续训记录' : '准备训练数据', ready: dataReady },
+    { label: '设置训练目标', ready: hasTargets },
+  ];
+  const readyCount = preparation.filter(step => step.ready).length;
+  const dataModeLabel = params.trainingMode === 'resume' ? '使用续训数据' : { full: '原始音频', existing: '已有音频标注', cached: '复用特征数据' }[params.preprocessingMode];
+  const selectedSource = data.versions.find(version => version.version === params.sourceVersion);
+  const clearFiles = () => {
+    setFiles([]);
+    if (fileInput.current) fileInput.current.value = '';
+    if (directoryInput.current) directoryInput.current.value = '';
+  };
+
   return (
     <MainLayout title="训练工作台" subtitle="准备数据、训练模型、查看日志与试听。" currentView={AppView.TRAINING} hideHeader contentClassName="min-h-0">
-      <div className="training-workbench pb-5">
-        <div className="flex flex-wrap gap-2 px-2">
+      <div className="training-workbench">
+        <nav className="training-tabs" aria-label="训练工作台导航">
           {([{ id: 'prepare', label: '训练准备', Icon: Layers }, { id: 'monitor', label: '训练监控与试听', Icon: Activity }, { id: 'history', label: '训练历史', Icon: History }] as const).map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => setPanel(id)} className={`training-tab rounded-t-2xl border border-b-0 px-5 py-4 text-sm font-black ${panel === id ? 'training-tab-active' : ''}`}><Icon className="mr-2 inline h-4 w-4" />{label}</button>
+            <button key={id} aria-label={label} aria-current={panel === id ? 'page' : undefined} onClick={() => setPanel(id)} className={'training-tab ' + (panel === id ? 'training-tab-active' : '')}>
+              <Icon size={17} />{label}
+              {id === 'history' && training.history.length > 0 && <span className="training-tab-count" aria-hidden="true">{training.history.length}</span>}
+              {id === 'monitor' && busy && <span className="training-live-dot" />}
+            </button>
           ))}
-        </div>
-        <section className="training-page-surface rounded-2xl border p-4 lg:p-5">
-          {(pageError || training.error) && <div role="alert" className="theme-status-block-danger mb-4 rounded-xl p-4 text-sm">{pageError || training.error}</div>}
-          {panel === 'prepare' && <div className="space-y-4">
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-              <section className={cardClass}>
-                <h3 className="theme-title mb-4 text-lg font-black">训练对象</h3>
-                <div className="mb-4 flex gap-2">
-                  <button disabled={busy} onClick={() => setRoleMode('existing')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${params.roleMode === 'existing' ? 'theme-nav-item-active' : 'theme-section-soft'}`}>已有角色 / 新增版本或复训</button>
-                  <button disabled={busy} onClick={() => setRoleMode('new')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${params.roleMode === 'new' ? 'theme-nav-item-active' : 'theme-section-soft'}`}>创建新角色</button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <CustomSelect label="所属世界" value={params.worldName || ''} options={worlds.map(w => ({ id: w.name, name: w.name }))} disabled={busy} onChange={worldName => { setFiles([]); setParams(previous => ({ ...previous, worldName, characterName: '', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' })); }} placeholder="选择世界" variant="filled" />
-                  <CustomSelect label="模型版本" value={params.version} options={versions.map(v => ({ id: v, name: v }))} disabled={busy} onChange={setVersion} variant="filled" />
-                  {params.roleMode === 'existing' ? <CustomSelect label="已有角色" value={params.characterName} options={[...new Set([...roles, ...(params.characterName ? [params.characterName] : [])])].map(name => ({ id: name, name }))} disabled={busy || !params.worldName} onChange={characterName => setParams(previous => ({ ...previous, characterName, sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' }))} placeholder="选择角色" variant="filled" /> : field('characterName', '新角色名称')}
-                  {field('gpuNumbers', 'GPU 编号（如 0 或 0,1）')}
-                </div>
-                {duplicate && <p className="mt-3 text-sm text-red-600">角色已存在，使用已有角色可以新增模型版本。</p>}
-                {params.version.startsWith('v5') && <p className="theme-subtitle mt-4 text-sm">V5 使用对应的 Dev / Turbo 底模及 LoRA；GPT 默认底模为 s1v3。预设：SoVITS 12 轮，GPT 20 轮。</p>}
-              </section>
-              <section className={cardClass}>
-                <h3 className="theme-title mb-4 text-lg font-black">训练方式</h3>
-                <label className="mb-4 block text-sm font-bold">起点
-                  <select aria-label="训练起点" name="trainingMode" value={params.trainingMode} onChange={change} disabled={busy} className={`${inputClass} mt-2`}>
-                    <option value="fresh">从官方底模重新训练</option><option value="resume">从已有训练 checkpoint 续训</option>
+        </nav>
+        {(pageError || training.error) && <div role="alert" className="training-error-banner">{pageError || training.error}</div>}
+        {defaultsError && <div role="alert" className="training-error-banner">训练默认配置加载失败：{defaultsError} <button type="button" onClick={() => void loadDefaults()}>重新加载</button></div>}
+
+        {panel === 'prepare' && <div className="training-prepare-layout">
+          <div className="training-form-sections">
+            <section className={cardClass}>
+              <SectionHeading step="01" title="训练对象" description="选择已有角色，或为一个新声音创建模型。" />
+              <div className="training-segmented" aria-label="角色类型">
+                <button disabled={busy} aria-pressed={params.roleMode === 'existing'} onClick={() => setRoleMode('existing')}><UserRound size={15} />已有角色</button>
+                <button disabled={busy} aria-pressed={params.roleMode === 'new'} onClick={() => setRoleMode('new')}><Plus size={15} />创建新角色</button>
+              </div>
+              <div className="training-identity-fields">
+                <label className="training-field"><span>所属世界</span>
+                  <select aria-label="所属世界" value={params.worldName || ''} disabled={busy} onChange={e => {
+                    const worldName = e.target.value;
+                    setFiles([]);
+                    setParams(previous => ({ ...previous, worldName, characterName: '', sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' }));
+                  }} className={inputClass}>
+                    <option value="">选择所属世界</option>{worlds.map(world => <option key={world.id} value={world.name}>{world.name}</option>)}
                   </select>
                 </label>
-                {params.trainingMode === 'resume' ? <>
-                  <label className="block text-sm font-bold">续训记录
-                    <select aria-label="续训记录" name="resumeWorkspace" value={params.resumeWorkspace} onChange={e => { const choice = resumeChoices.find(c => c.workspace === e.target.value); setParams(previous => ({ ...previous, resumeWorkspace: e.target.value, loraRank: choice?.lora_ranks.find(rank => rank > 0) || previous.loraRank })); }} disabled={busy} className={`${inputClass} mt-2`}>
-                      <option value="">请选择含训练 checkpoint 的目录</option>{resumeChoices.map(choice => <option key={choice.workspace} value={choice.workspace}>{choice.label} · {choice.gpt ? 'GPT ' : ''}{choice.sovits ? 'SoVITS' : ''}</option>)}
+                {params.roleMode === 'existing'
+                  ? <label className="training-field"><span>角色名称</span>
+                    <select aria-label="已有角色" value={params.characterName} disabled={busy || !params.worldName} onChange={e => {
+                      const characterName = e.target.value;
+                      setParams(previous => ({ ...previous, characterName, sourceVersion: '', sourceWorkspace: '', resumeWorkspace: '' }));
+                    }} className={inputClass}>
+                      <option value="">{params.worldName ? '选择角色' : '请先选择世界'}</option>
+                      {[...new Set([...roles, ...(params.characterName ? [params.characterName] : [])])].map(name => <option key={name} value={name}>{name}</option>)}
                     </select>
                   </label>
-                  <p className="theme-subtitle mt-3 text-sm">轮数是累计目标，例如已经训练 12 轮，继续到 16 轮请填写 16。LoRA rank 必须与 checkpoint 一致。</p>
-                </> : <p className="theme-subtitle text-sm leading-6">每次重训会创建独立目录，从第 1 轮开始。完成后发布新权重，历史权重保留。</p>}
-                <div className="mt-4 flex gap-5 text-sm font-bold">
-                  <label><input name="trainSovits" type="checkbox" checked={params.trainSovits} onChange={change} disabled={busy} className="mr-2" />训练 SoVITS</label>
-                  <label><input name="trainGpt" type="checkbox" checked={params.trainGpt} onChange={change} disabled={busy} className="mr-2" />训练 GPT</label>
-                </div>
-                <label className="mt-4 block text-sm font-bold">训练顺序
-                  <select name="trainingOrder" value={params.trainingOrder} onChange={change} disabled={busy} className={`${inputClass} mt-2`}><option value="sovits_first">先 SoVITS，后 GPT</option><option value="gpt_first">先 GPT，后 SoVITS</option></select>
-                </label>
-              </section>
-            </div>
-            {params.trainingMode === 'fresh' && <section className={cardClass}>
-              <h3 className="theme-title mb-4 flex items-center gap-2 text-lg font-black"><Database className="h-5 w-5" />训练数据</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="text-sm font-bold">数据方式
-                  <select aria-label="数据方式" name="preprocessingMode" value={params.preprocessingMode} onChange={change} disabled={busy} className={`${inputClass} mt-2`}>
-                    <option value="full">原始音频：切分、ASR、提取特征</option><option value="existing">已有切分音频和 .list 标注</option><option value="cached" disabled={params.roleMode === 'new'}>复用已有特征数据</option>
+                  : field('characterName', '新角色名称', 'text', undefined, '输入角色名称')}
+                <label className="training-field"><span>模型版本</span>
+                  <select aria-label="模型版本" value={params.version} onChange={e => setVersion(e.target.value)} disabled={busy} className={inputClass}>
+                    {versions.map(version => <option key={version} value={version}>{formatModelVersion(version)}</option>)}
                   </select>
-                </label>
-                <label className="text-sm font-bold">标注语言
-                  <select name="language" value={params.language} onChange={change} disabled={busy} className={`${inputClass} mt-2`}>{[['zh', '中文'], ['yue', '粤语'], ['en', '英语'], ['ja', '日语'], ['ko', '韩语'], ['auto', '自动识别']].map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
                 </label>
               </div>
-              {params.preprocessingMode === 'cached' ? <div className="mt-4">
-                <label className="text-sm font-bold">特征来源版本
-                  <select aria-label="特征来源版本" value={params.sourceVersion} disabled={busy || dataLoading} onChange={e => { const entry = data.versions.find(v => v.version === e.target.value); setParams(previous => ({ ...previous, sourceVersion: e.target.value, sourceWorkspace: entry?.workspace || '' })); }} className={`${inputClass} mt-2`}>
-                    <option value="">请选择数据来源</option>{data.versions.filter(v => v.has_features).map(v => <option key={v.version} value={v.version}>{v.version} · {v.text_lines} 段标注</option>)}
+              {duplicate && <p role="alert" className="training-inline-error">角色已存在，请切换到“已有角色”。</p>}
+              <div className="training-starting-point">
+                <label className="training-field"><span>训练起点</span>
+                  <select aria-label="训练起点" name="trainingMode" value={params.trainingMode} onChange={change} disabled={busy} className={inputClass}>
+                    <option value="fresh">从底模重新训练</option><option value="resume">从已有记录继续训练</option>
                   </select>
                 </label>
-                <p className="theme-subtitle mt-3 text-sm">复用 BERT、HuBERT 和音频特征；切换底模版本时重新提取语义 token。</p>
-                {params.sourceWorkspace && <p className="theme-kicker mt-2 break-all font-mono text-xs">{params.sourceWorkspace}</p>}
-              </div> : <div className="mt-4 space-y-4">
-                {params.preprocessingMode === 'full' && <div className={`rounded-xl border-2 border-dashed p-5 ${dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-300'}`} onDragOver={e => { e.preventDefault(); if (!busy) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!busy) setFiles(Array.from(e.dataTransfer.files).filter(isAudio)); }}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Upload className="h-5 w-5" /><span className="text-sm font-bold">拖入音频，或选择文件 / 文件夹</span>
-                    <button disabled={busy} className="theme-section-soft rounded-lg border px-3 py-2 text-sm" onClick={() => fileInput.current?.click()}>选择音频</button>
-                    <button disabled={busy} className="theme-section-soft rounded-lg border px-3 py-2 text-sm" onClick={() => directoryInput.current?.click()}>选择文件夹</button>
-                    <input ref={fileInput} type="file" accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.aac" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files || []).filter(isAudio))} />
-                    <input ref={directoryInput} type="file" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files || []).filter(isAudio))} />
-                  </div>
-                  {files.length > 0 && <div className="mt-4"><div className="mb-3 flex justify-between text-sm"><span>已选择 {files.length} 个音频 · 首个：{files[0].name}</span><button disabled={busy} onClick={() => setFiles([])} className="text-red-600">清空</button></div><audio controls src={sourceAudio} className="w-full" /></div>}
-                </div>}
-                <div className="grid items-end gap-3 md:grid-cols-[1fr_auto]">
-                  {field('inputAudioDir', params.preprocessingMode === 'existing' ? '服务器上的切分音频目录' : '服务器上的原始音频目录（上传时可留空）')}
-                  <button disabled={busy} onClick={() => void chooseServerPath('inputAudioDir')} className="theme-section-soft rounded-xl border px-4 py-3 text-sm"><FolderOpen className="mr-2 inline h-4 w-4" />选择服务器目录</button>
-                  {params.preprocessingMode === 'existing' && <>{field('listFile', '.list 标注文件路径')}<button disabled={busy} onClick={() => void chooseServerPath('listFile')} className="theme-section-soft rounded-xl border px-4 py-3 text-sm">选择 .list 文件</button></>}
-                </div>
-              </div>}
-            </section>}
-            <section className={cardClass}>
-              <div className="mb-4 flex items-center justify-between"><h3 className="theme-title text-lg font-black">训练参数</h3><button disabled={busy} onClick={() => setParams(previous => ({ ...previous, ...defaults(previous.version) }))} className="theme-section-soft rounded-lg border px-3 py-2 text-sm">恢复版本预设</button></div>
-              <TrainingParamsSection params={params} isTraining={busy} onChange={change} />
-              <details className="mt-4"><summary className="cursor-pointer text-sm font-bold">高级参数</summary>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {field('sovitsLearningRate', 'SoVITS 学习率', 'number', '0.00001')}{field('gptLearningRate', 'GPT 学习率', 'number', '0.001')}
-                  {field('saveEveryEpoch', '每隔几轮保存', 'number')}{params.version.startsWith('v5') || ['v3', 'v4'].includes(params.version) ? field('loraRank', 'LoRA rank', 'number') : null}
-                  {field('logInterval', 'SoVITS 每隔几步记录 Loss', 'number')}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-5 text-sm"><label><input name="gradCheckpoint" type="checkbox" checked={params.gradCheckpoint} onChange={change} disabled={busy} className="mr-2" />梯度检查点（节省显存）</label><label><input name="fp16" type="checkbox" checked={params.fp16} onChange={change} disabled={busy} className="mr-2" />混合精度</label></div>
-              </details>
+                <p>{params.trainingMode === 'resume' ? '保留已有进度，继续训练到新的目标轮数。' : '每次创建独立的训练记录，保留历史权重。'}</p>
+              </div>
             </section>
-            <section className={`${cardClass} flex flex-col gap-3`}>
-              {busy ? <button disabled={training.isSubmitting || training.workflow?.stop_requested} onClick={() => void training.stop()} className="theme-status-block-warning rounded-xl px-5 py-4 font-bold"><Square className="mr-2 inline h-4 w-4" />停止当前训练</button> : <>
-                <button disabled={!canStart || (!params.trainGpt && !params.trainSovits)} title={reason} onClick={() => void start('selected')} className={`${canStart && (params.trainGpt || params.trainSovits) ? 'theme-button-amber' : 'theme-button-disabled'} rounded-xl px-5 py-4 font-bold`}><Play className="mr-2 inline h-4 w-4" />开始所选训练</button>
-                <div className="grid gap-3 md:grid-cols-2"><button disabled={!canStart} onClick={() => void start('sovits')} className="theme-section-soft rounded-xl border px-4 py-3 text-sm font-bold disabled:opacity-50">仅训练 SoVITS</button><button disabled={!canStart} onClick={() => void start('gpt')} className="theme-section-soft rounded-xl border px-4 py-3 text-sm font-bold disabled:opacity-50">仅训练 GPT</button></div>
-                {reason && <p className="theme-subtitle text-sm">{reason}</p>}
+
+            <section className={cardClass}>
+              <SectionHeading step="02" title={params.trainingMode === 'resume' ? '续训记录' : '训练数据'} description={params.trainingMode === 'resume' ? '选择与当前模型版本匹配的训练记录。' : '使用新的音频素材，或复用已经准备好的数据。'} />
+              {params.trainingMode === 'resume' ? <div className="training-resume-fields">
+                <label className="training-field"><span>选择训练记录</span>
+                  <select aria-label="续训记录" name="resumeWorkspace" value={params.resumeWorkspace} onChange={e => {
+                    const resumeWorkspace = e.target.value;
+                    const choice = resumeChoices.find(c => c.workspace === resumeWorkspace);
+                    setParams(previous => ({ ...previous, resumeWorkspace, loraRank: choice?.lora_ranks.find(rank => rank > 0) || previous.loraRank }));
+                  }} disabled={busy || dataLoading} className={inputClass}>
+                    <option value="">{dataLoading ? '正在读取训练记录…' : '请选择含 checkpoint 的记录'}</option>
+                    {resumeChoices.map(choice => <option key={choice.workspace} value={choice.workspace}>{choice.label} · {choice.gpt ? 'GPT ' : ''}{choice.sovits ? 'SoVITS' : ''}</option>)}
+                  </select>
+                </label>
+                <div className="training-info-note"><CircleHelp size={17} /><p>轮数填写累计目标。例如已经训练 12 轮，继续到 16 轮时填写 16。LoRA rank 需与原记录一致。</p></div>
+              </div> : <>
+                <div className="training-data-modes" role="radiogroup" aria-label="数据方式">
+                  {([{ id: 'full', title: '原始音频', description: '自动切分、识别和提取特征', Icon: AudioLines }, { id: 'existing', title: '已有标注', description: '使用切分音频与 .list 文件', Icon: FileText }, { id: 'cached', title: '复用特征', description: '使用已有角色的特征数据', Icon: Database }] as const).map(({ id, title, description, Icon }) => (
+                    <label key={id} className={'training-data-mode ' + (params.preprocessingMode === id ? 'is-selected ' : '') + (id === 'cached' && params.roleMode === 'new' ? 'is-disabled' : '')}>
+                      <input type="radio" name="preprocessingMode" value={id} checked={params.preprocessingMode === id} disabled={busy || (id === 'cached' && params.roleMode === 'new')} onChange={change} aria-label={title} />
+                      <div className="training-data-mode-top"><Icon size={20} /><span className="training-radio-mark">{params.preprocessingMode === id && <Check size={11} />}</span></div>
+                      <strong>{title}</strong><span>{description}</span>
+                    </label>
+                  ))}
+                </div>
+                {params.preprocessingMode === 'cached' ? <div className="training-data-content">
+                  <label className="training-field"><span>特征来源版本</span>
+                    <select aria-label="特征来源版本" value={params.sourceVersion} disabled={busy || dataLoading} onChange={e => {
+                      const sourceVersion = e.target.value;
+                      const entry = data.versions.find(version => version.version === sourceVersion);
+                      setParams(previous => ({ ...previous, sourceVersion, sourceWorkspace: entry?.workspace || '' }));
+                    }} className={inputClass}>
+                      <option value="">{dataLoading ? '正在读取角色数据…' : '选择已有的特征数据'}</option>
+                      {data.versions.filter(version => version.has_features).map(version => <option key={version.version} value={version.version}>{formatModelVersion(version.version)} · {version.text_lines} 段标注</option>)}
+                    </select>
+                  </label>
+                  {selectedSource ? <div className="training-feature-note"><span className="training-feature-icon"><Check size={19} /></span><div><strong>{selectedSource.text_lines} 段标注可复用</strong><p>复用音频与文本特征；切换模型版本时自动更新语义特征。</p></div></div> : <p className="training-field-hint">先选择世界和角色，再选择可用的特征数据。</p>}
+                  {params.sourceWorkspace && <details className="training-path-details"><summary>查看数据目录<ChevronDown size={14} /></summary><p>{params.sourceWorkspace}</p></details>}
+                </div> : <div className="training-data-content">
+                  {params.preprocessingMode === 'full' && <>
+                    <div className={'training-dropzone ' + (dragging ? 'is-dragging ' : '') + (busy ? 'is-disabled' : '')} onDragOver={e => { e.preventDefault(); if (!busy) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!busy) setFiles(Array.from(e.dataTransfer.files).filter(isAudio)); }}>
+                      <div className="training-upload-icon"><Upload size={24} /></div><strong>将音频拖到这里</strong><p>支持 WAV、MP3、FLAC 等常见音频格式</p>
+                      <div className="training-upload-actions"><button disabled={busy} className="training-button training-button-secondary" onClick={() => fileInput.current?.click()}><Plus size={15} />选择音频</button><button disabled={busy} className="training-text-button" onClick={() => directoryInput.current?.click()}><FolderOpen size={15} />选择文件夹</button></div>
+                      <input ref={fileInput} aria-label="上传音频文件" type="file" accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.aac" multiple hidden onChange={e => setFiles(Array.from(e.target.files || []).filter(isAudio))} />
+                      <input ref={directoryInput} aria-label="上传音频文件夹" type="file" multiple hidden onChange={e => setFiles(Array.from(e.target.files || []).filter(isAudio))} />
+                    </div>
+                    {files.length > 0 && <div className="training-upload-selection">
+                      <div className="training-upload-selection-header"><div><FileAudio size={17} /><strong>已选择 {files.length} 个音频</strong><span>{(files.reduce((size, file) => size + file.size, 0) / 1024 / 1024).toFixed(1)} MB</span></div><button disabled={busy} onClick={clearFiles} className="training-text-button" aria-label="清空已选音频"><X size={15} />清空</button></div>
+                      <p className="training-selected-filenames">{files.slice(0, 3).map(file => file.name).join('、')}{files.length > 3 ? ' 等 ' + files.length + ' 个文件' : ''}</p><audio aria-label="原始音频试听" controls src={sourceAudio} />
+                    </div>}
+                  </>}
+                  {params.preprocessingMode === 'existing' ? <div className="training-server-fields">
+                    <div className="training-path-field">{field('inputAudioDir', '切分音频目录', 'text', undefined, '填写服务器上的音频目录')}<button disabled={busy} onClick={() => void chooseServerPath('inputAudioDir')} className="training-browse-button" aria-label="选择服务器目录" title="选择服务器目录"><FolderOpen size={18} /></button></div>
+                    <div className="training-path-field">{field('listFile', '.list 标注文件', 'text', undefined, '填写标注文件路径')}<button disabled={busy} onClick={() => void chooseServerPath('listFile')} className="training-browse-button" aria-label="选择 .list 文件" title="选择 .list 文件"><FolderOpen size={18} /></button></div>
+                  </div> : <details className="training-server-source">
+                    <summary><FolderOpen size={15} />使用服务器上的音频<ChevronDown size={14} /></summary>
+                    <div className="training-path-field">{field('inputAudioDir', '原始音频目录', 'text', undefined, '已上传音频时可留空')}<button disabled={busy} onClick={() => void chooseServerPath('inputAudioDir')} className="training-browse-button" aria-label="选择服务器目录" title="选择服务器目录"><FolderOpen size={18} /></button></div>
+                  </details>}
+                </div>}
+                <div className="training-language-row">
+                  <label className="training-field"><span>标注语言</span><select aria-label="标注语言" name="language" value={params.language} onChange={change} disabled={busy} className={inputClass}>{[['zh', '中文'], ['yue', '粤语'], ['en', '英语'], ['ja', '日语'], ['ko', '韩语'], ['auto', '自动识别']].map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></label><p>选择音频中使用的主要语言。</p>
+                </div>
               </>}
             </section>
-          </div>}
-          {panel === 'monitor' && <div className="space-y-4">
-            {training.workflow && <div className={`${cardClass} flex flex-wrap items-center justify-between gap-3`}><div><h3 className="font-black">{training.workflow.project_name} / {training.workflow.version}</h3><p className="theme-subtitle mt-1 text-sm">{training.currentMessage}</p><p className="theme-kicker mt-1 font-mono text-xs">{training.workflow.workflow_id}</p></div>{busy && <button disabled={training.workflow.stop_requested} onClick={() => void training.stop()} className="theme-status-block-warning rounded-xl px-4 py-3 text-sm font-bold">停止训练</button>}</div>}
-            <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]"><div className={cardClass}><TrainingMonitor isTraining={busy} phaseStatuses={training.phaseStatuses} error={training.workflow?.error || training.error} currentMessage={training.currentMessage} getSubStepStatus={training.getSubStepStatus} /></div><TrainingRunDetails workflow={training.workflow} /></div>
-          </div>}
-          {panel === 'history' && <section className={cardClass}>
-            <div className="mb-4 flex justify-between"><h3 className="text-lg font-black">训练历史</h3><button onClick={() => void training.refreshHistory()} className="theme-section-soft rounded-lg border px-3 py-2 text-sm">刷新</button></div>
-            <p className="theme-subtitle mb-4 text-sm">这里保留由训练工作台启动的任务。已有脚本训练的 checkpoint 可在“续训记录”中选择。</p>
-            {!training.history.length && <p className="theme-subtitle py-8 text-center">还没有工作台训练记录</p>}
-            <div className="space-y-3">{training.history.map(run => <div key={run.workflow_id} data-run-id={run.workflow_id} className="theme-section-soft flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><div className="font-bold">{run.world_name} / {run.project_name} / {run.version} · {statusNames[run.status]}{run.options?.publish_models === false ? ' · 验证任务（未发布）' : ''}</div><div className="theme-subtitle mt-1 text-xs">{run.created_at?.replace('T', ' ').slice(0, 19)} · {run.order.map(t => t.toUpperCase()).join(' → ')}</div>{run.error && <p className="mt-2 max-w-2xl break-words text-xs text-red-600">{run.error}</p>}</div><div className="flex gap-2"><button onClick={() => { training.selectRun(run); setPanel('monitor'); }} className="theme-section rounded-lg border px-3 py-2 text-sm">查看日志 / 试听</button>{['completed', 'stopped', 'failed', 'interrupted'].includes(run.status) && <button onClick={() => resumeFromHistory(run)} className="theme-section rounded-lg border px-3 py-2 text-sm">配置续训</button>}</div></div>)}</div>
-          </section>}
-        </section>
+
+            <section className={cardClass}>
+              <SectionHeading step="03" title="训练参数" description={defaultsLoading ? '正在读取训练默认配置…' : 'Batch 按本机显存设置，每个阶段只在训练结束时保存一次。'} action={<button disabled={busy || defaultsLoading || Boolean(defaultsError)} onClick={() => setParams(previous => ({ ...previous, ...defaults(previous.version) }))} className="training-text-button"><RefreshCw size={14} />恢复默认参数</button>} />
+              <TrainingParamsSection params={params} isTraining={busy || defaultsLoading} onChange={change} />
+              <details className="training-advanced">
+                <summary><Settings2 size={16} /><span>高级设置<small>设备、学习率与保存策略</small></span><ChevronDown size={16} /></summary>
+                <div className="training-advanced-fields">
+                  {field('gpuNumbers', 'GPU 编号', 'text', undefined, '例如 0 或 0,1')}
+                  <label className="training-field"><span>训练顺序</span><select aria-label="训练顺序" name="trainingOrder" value={params.trainingOrder} onChange={change} disabled={busy} className={inputClass}><option value="sovits_first">先 SoVITS，后 GPT</option><option value="gpt_first">先 GPT，后 SoVITS</option></select></label>
+                  {field('sovitsLearningRate', 'SoVITS 学习率', 'number', '0.00001')}{field('gptLearningRate', 'GPT 学习率', 'number', '0.001')}
+                  {params.version.startsWith('v5') || ['v3', 'v4'].includes(params.version) ? field('loraRank', 'LoRA rank', 'number') : null}
+                  {field('logInterval', 'SoVITS 每隔几步记录 Loss', 'number')}
+                </div>
+                <p className="training-selected-filenames">保存策略：SoVITS 在第 {params.sovitsEpoch} 轮、GPT 在第 {params.gptEpoch} 轮各保存一次。</p>
+                <div className="training-advanced-toggles">
+                  <label><input name="gradCheckpoint" type="checkbox" checked={params.gradCheckpoint} onChange={change} disabled={busy || defaultsLoading} />梯度检查点（节省显存）</label>
+                  <label><input name="fp16" type="checkbox" checked={params.fp16} onChange={change} disabled={busy || defaultsLoading} />混合精度</label>
+                </div>
+              </details>
+            </section>
+          </div>
+
+          <aside className="training-summary-column" aria-label="训练概览">
+            <section className="training-summary-card">
+              <div className="training-summary-heading"><span className="training-summary-icon"><Layers size={20} /></span><div><h2>本次训练</h2><p>确认配置后即可开始</p></div></div>
+              <div className="training-summary-role">{busy ? training.workflow?.project_name || '正在提交训练' : params.characterName.trim() || '选择你的训练角色'}<span>{(busy ? training.workflow?.world_name : params.worldName) || '尚未选择世界'}</span></div>
+              <dl className="training-summary-rows">
+                <div><dt>模型版本</dt><dd>{formatModelVersion(busy ? training.workflow?.version || params.version : params.version)}</dd></div>
+                <div><dt>训练起点</dt><dd>{params.trainingMode === 'resume' ? '继续已有训练' : '从底模重新训练'}</dd></div>
+                <div><dt>训练数据</dt><dd>{dataModeLabel}</dd></div>
+                <div><dt>训练设备</dt><dd><Cpu size={13} />GPU {params.gpuNumbers || '0'}</dd></div>
+              </dl>
+              <div className="training-summary-targets">
+                {params.trainSovits && <span>SoVITS <strong>{params.sovitsEpoch} 轮</strong></span>}{params.trainGpt && <span>GPT <strong>{params.gptEpoch} 轮</strong></span>}{!hasTargets && <span>尚未选择训练目标</span>}
+              </div>
+              {!busy && <div className="training-readiness">
+                <div className="training-readiness-heading"><span>准备进度</span><span>{readyCount} / 3</span></div>
+                <div className="training-readiness-track"><span style={{ width: String(readyCount / 3 * 100) + '%' }} /></div>
+                {preparation.map(step => <div className={'training-readiness-step ' + (step.ready ? 'is-ready' : '')} key={step.label}><span>{step.ready ? <Check size={11} /> : null}</span>{step.label}</div>)}
+              </div>}
+              {busy ? <div className="training-summary-actions">
+                <button className="training-button training-button-primary" onClick={() => setPanel('monitor')}><Activity size={17} />查看训练监控<ArrowRight size={15} /></button>
+                <button disabled={training.isSubmitting || training.workflow?.stop_requested} onClick={() => void training.stop()} className="training-button training-button-stop"><Square size={14} />{training.workflow?.stop_requested ? '正在停止…' : '停止当前训练'}</button>
+              </div> : <div className="training-summary-actions">
+                <button disabled={!canStart || !hasTargets} title={reason || (!hasTargets ? '请选择至少一个训练目标' : '')} onClick={() => void start('selected')} className="training-button training-button-primary"><Play size={16} fill="currentColor" />开始训练<ArrowRight size={16} /></button>
+              </div>}
+            </section>
+          </aside>
+        </div>}
+
+        {panel === 'monitor' && (training.workflow ? <div className="training-monitor-panel">
+          <div className="training-card training-run-banner"><div><span className={'training-run-status is-' + training.workflow.status}>{statusNames[training.workflow.status]}</span><h2>{training.workflow.project_name}<span>{formatModelVersion(training.workflow.version)}</span></h2><p>{training.currentMessage}</p></div>{busy && <button disabled={training.workflow.stop_requested} onClick={() => void training.stop()} className="training-button training-button-stop"><Square size={14} />停止训练</button>}</div>
+          <div className="training-monitor-grid"><div className={cardClass}><TrainingMonitor isTraining={busy} phaseStatuses={training.phaseStatuses} error={training.workflow.error || training.error} currentMessage={training.currentMessage} getSubStepStatus={training.getSubStepStatus} /></div><TrainingRunDetails workflow={training.workflow} /></div>
+        </div> : <section className="training-card training-empty-state">
+          <span className="training-empty-icon"><Activity size={30} /></span><h2>训练进度，会在这里呈现</h2><p>启动一次训练，或从历史记录中选择任务，查看进度、曲线与试听。</p><div><button className="training-button training-button-primary" onClick={() => setPanel('prepare')}>准备训练<ArrowRight size={16} /></button><button className="training-text-button" onClick={() => setPanel('history')}>查看训练历史</button></div>
+        </section>)}
+
+        {panel === 'history' && <section className={cardClass + ' training-history-panel'}>
+          <div className="training-section-heading"><div><h2>训练记录</h2><p>每一次训练的进度、参数与结果，都保留在这里。</p></div><button onClick={() => void training.refreshHistory()} className="training-button training-button-secondary"><RefreshCw size={15} />刷新记录</button></div>
+          {!training.history.length ? <div className="training-empty-state"><span className="training-empty-icon"><History size={30} /></span><h2>还没有训练记录</h2><p>从准备一个角色的声音开始，创建你的第一次训练。</p><button className="training-button training-button-primary" onClick={() => setPanel('prepare')}><Plus size={16} />创建训练</button></div>
+            : <div className="training-history-list">{training.history.map(run => <article key={run.workflow_id} data-run-id={run.workflow_id} className="training-history-row">
+              <span className="training-history-icon"><AudioLines size={22} /></span>
+              <div className="training-history-info"><div><h3>{run.project_name}</h3><span className={'training-run-status is-' + run.status}>{statusNames[run.status]}</span>{run.options?.publish_models === false && <span className="training-history-test-tag">验证任务</span>}</div><p>{run.world_name} <span>·</span> {formatModelVersion(run.version)} <span>·</span> {run.order.map(target => target.toUpperCase()).join(' → ')}</p><time>{run.created_at?.replace('T', ' ').slice(0, 16)}</time>{run.error && <p className="training-inline-error">{run.error}</p>}</div>
+              <div className="training-history-actions"><button onClick={() => { training.selectRun(run); setPanel('monitor'); }} className="training-button training-button-secondary">查看详情<ChevronRight size={14} /></button>{['completed', 'stopped', 'failed', 'interrupted'].includes(run.status) && <button onClick={() => resumeFromHistory(run)} className="training-text-button">配置续训</button>}</div>
+            </article>)}</div>}
+        </section>}
       </div>
     </MainLayout>
   );

@@ -71,7 +71,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
         </p>
       </div>
 
-      <nav className="flex-1 px-4 py-5 space-y-2 overflow-y-auto">
+      <nav aria-label="主导航" className="flex-1 px-4 py-5 space-y-2 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = currentView === item.view;
@@ -80,6 +80,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
             <button
               key={item.view}
               type="button"
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
+              title={item.label}
               onClick={() => onViewChange(item.view)}
               className={[
                 'w-full rounded-xl border px-4 py-4 text-left transition-all duration-200',

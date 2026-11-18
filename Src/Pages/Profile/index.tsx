@@ -323,7 +323,7 @@ const ProfileSettings: React.FC = () => {
                   <strong>{profile.voiceprintThreshold.toFixed(2)}</strong>
                 </span>
                 <input
-                  className="mt-3 w-full accent-blue-500"
+                  className="mt-3 w-full accent-[var(--color-amber-400)]"
                   type="range"
                   min="0.5"
                   max="0.95"

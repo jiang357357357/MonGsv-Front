@@ -43,13 +43,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="theme-app-shell h-screen w-screen relative overflow-hidden font-sans">
+    <div className={`theme-app-shell h-screen w-screen relative overflow-hidden font-sans ${isTrainingView ? 'training-view-shell' : ''}`}>
 
       {/* Unified Main Console Container - Full Screen */}
       <div className="theme-app-frame w-full h-full flex shadow-2xl relative z-10 overflow-hidden">
 
         {/* Navigation Sidebar (Integrated) */}
-        <div className="theme-sidebar flex-shrink-0 z-20 backdrop-blur-xl border-r">
+        <div className="theme-sidebar app-navigation flex-shrink-0 z-20 border-r">
           <Navigation currentView={currentView} onViewChange={setCurrentView} />
         </div>
 
